@@ -10,6 +10,7 @@ AI 可通过浏览器操作 SSH 的工具（xshell 增强版）。
 | 终端尺寸适配 | xterm-resize（@xterm/addon-fit） |
 | 桌面壳 | Electron |
 | 后端 | Python FastAPI |
+| AI 解析层 | 规划中：意图解析 → 终端操作；输出理解 → 下一步决策 |
 
 ## 测试环境
 
