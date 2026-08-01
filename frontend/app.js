@@ -949,15 +949,18 @@ async function renderBgPanel() {
     info.append(nm, hs);
     const res = document.createElement("button");
     res.className = "btn small"; res.textContent = "恢复";
-    res.addEventListener("click", () => { openTab(c.sid, c.conn_id, "restore"); hideBgPanel(); });
+    res.addEventListener("click", (e) => { e.stopPropagation(); openTab(c.sid, c.conn_id, "restore"); hideBgPanel(); });
     const disc = document.createElement("button");
     disc.className = "btn small danger"; disc.textContent = "断开";
-    disc.addEventListener("click", async () => {
+    disc.addEventListener("click", async (e) => {
+      e.stopPropagation();
       try { await api(`/api/connections/${c.conn_id}/disconnect`, { method: "POST" }); } catch (_) {}
       await renderBgPanel();
       refreshStatuses();
     });
     row.append(info, res, disc);
+    row.title = "点击恢复";
+    row.addEventListener("click", () => { openTab(c.sid, c.conn_id, "restore"); hideBgPanel(); }); // 整行可点恢复
     list.append(row);
   }
 }
