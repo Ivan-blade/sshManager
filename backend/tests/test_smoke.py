@@ -282,7 +282,8 @@ def test_quick_commands_crud(client):
         assert any(x["id"] == cid for x in client.get("/api/quick/commands").json())
         # 删除分组（命令回未分组）
         assert client.delete(f"/api/quick/groups/{gid}").json()["ok"] is True
-        assert client.get(f"/api/quick/commands").json()[0]["group_id"] is None
+        cmds = client.get(f"/api/quick/commands").json()
+        assert next(x for x in cmds if x["id"] == cid)["group_id"] is None
         # 删命令
         assert client.delete(f"/api/quick/commands/{cid}").json()["ok"] is True
     finally:
