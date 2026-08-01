@@ -119,6 +119,44 @@ class SessionStore:
             self._save()
         return {"added": added, "skipped": skipped, "total": len(self._sessions)}
 
+    def import_bundle(self, groups: list[dict], sessions: list[dict]) -> dict:
+        """统一导入：分组按名称去重/复用，会话重写 group_id 映射到实际分组 id。"""
+        gid_map: dict[str, str] = {}
+        group_added = 0
+        for g in groups:
+            if not isinstance(g, dict) or not g.get("name"):
+                continue
+            existing = next(
+                (x for x in self.list_groups() if (x.get("name") or "").lower() == g["name"].lower()),
+                None,
+            )
+            if existing:
+                gid_map[g.get("id")] = existing["id"]
+            else:
+                ng = self.create_group(g["name"])
+                gid_map[g.get("id")] = ng["id"]
+                group_added += 1
+        added = skipped = 0
+        now = int(time.time())
+        with self._lock:
+            for raw in sessions:
+                if not isinstance(raw, dict) or not raw.get("name"):
+                    continue
+                if raw.get("id") in self._sessions:
+                    skipped += 1
+                    continue
+                rec = {"id": uuid.uuid4().hex,
+                       **{k: v for k, v in raw.items() if k != "id"},
+                       "created_at": now, "updated_at": now}
+                old_gid = raw.get("group_id")
+                if old_gid and old_gid in gid_map:
+                    rec["group_id"] = gid_map[old_gid]
+                self._sessions[rec["id"]] = rec
+                added += 1
+            self._save()
+        return {"groups_added": group_added, "added": added, "skipped": skipped,
+                "total": len(self._sessions)}
+
     # ---------------- 分组 ----------------
     def list_groups(self) -> list[dict]:
         with self._lock:

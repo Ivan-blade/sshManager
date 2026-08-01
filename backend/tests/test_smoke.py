@@ -226,6 +226,43 @@ def test_independent_connections(client, local_session):
     client.post(f"/api/connections/{c2}/disconnect")
 
 
+def test_export_import_bundle(client):
+    """导出筛选 + 统一导入（分组去重复用、会话 group_id 映射）。"""
+    # 建一个分组 + 会话
+    g = client.post("/api/groups", json={"name": f"exp-{int(time.time()*1000)}"})
+    gid = g.json()["id"]
+    s = client.post("/api/sessions", json={"name": "exp-s", "host": "1.2.3.4", "group_id": gid})
+    sid = s.json()["id"]
+    try:
+        # 按选择导出
+        r = client.post("/api/export", json={"group_ids": [gid], "session_ids": [sid]})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert [x["name"] for x in d["groups"]] == [g.json()["name"]]
+        assert [x["name"] for x in d["sessions"]] == ["exp-s"]
+
+        # 统一导入（新组 + 新会话，用假 gid 测映射）
+        imp = client.post("/api/import", json={
+            "groups": [{"id": "old-g", "name": f"imp-{int(time.time()*1000)}"}],
+            "sessions": [{"id": "old-s", "name": "imp-s", "host": "9.9.9.9", "group_id": "old-g"}],
+        })
+        assert imp.status_code == 200, imp.text
+        res = imp.json()
+        assert res["groups_added"] >= 1 and res["added"] >= 1
+        # 验证导入会话的 group_id 映射到实际分组
+        news = [x for x in client.get("/api/sessions").json() if x["name"] == "imp-s"]
+        assert news and news[0]["group_id"]
+        assert news[0]["group_id"] != "old-g"
+        for x in news:
+            client.delete(f"/api/sessions/{x['id']}")
+        for gname in client.get("/api/groups").json():
+            if gname["name"].startswith("imp-"):
+                client.delete(f"/api/groups/{gname['id']}")
+    finally:
+        client.delete(f"/api/sessions/{sid}")
+        client.delete(f"/api/groups/{gid}")
+
+
 def test_ai_capabilities(client):
     """AI 能力发现：概述 + 详情 + 未知 404。"""
     o = client.get("/api/ai/capabilities").json()

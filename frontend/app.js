@@ -712,27 +712,73 @@ async function createGroup(name) {
   await loadAll();
 }
 
-// 导入导出
-async function doExport() {
-  const items = await api("/api/sessions/export");
-  const json = JSON.stringify(items, null, 2);
-  try { await navigator.clipboard.writeText(json); toast("已复制到剪贴板（同时下载 JSON 文件）"); } catch (_) {}
-  const blob = new Blob([json], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `sshmanager-sessions-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+// 导出弹窗（选分组/会话 → 剪贴板或文件）
+function openExportModal() {
+  renderExportList("#exp-groups", state.groups, "group_ids");
+  renderExportList("#exp-sessions", state.sessions, "session_ids");
+  openModal($("#modal-export"));
 }
 
+function renderExportList(sel, items, type) {
+  const box = $(sel);
+  box.innerHTML = "";
+  if (!items.length) {
+    box.innerHTML = '<div class="exp-empty">（无）</div>';
+    return;
+  }
+  for (const it of items) {
+    const label = document.createElement("label");
+    label.className = "exp-item";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = it.id;
+    cb.checked = true;
+    const txt = document.createElement("span");
+    txt.textContent = type === "group_ids"
+      ? it.name
+      : `${it.name} · ${it.host || it.transport}`;
+    label.append(cb, txt);
+    box.append(label);
+  }
+}
+
+function toggleAllExport(sel) {
+  const cbs = document.querySelectorAll(`${sel} input[type=checkbox]`);
+  const allOn = [...cbs].every((c) => c.checked);
+  cbs.forEach((c) => { c.checked = !allOn; });
+}
+
+async function doExport(mode) {
+  const body = {
+    group_ids: [...document.querySelectorAll("#exp-groups input:checked")].map((e) => e.value),
+    session_ids: [...document.querySelectorAll("#exp-sessions input:checked")].map((e) => e.value),
+  };
+  const data = await api("/api/export", { method: "POST", body });
+  const json = JSON.stringify(data, null, 2);
+  if (mode === "clipboard") {
+    try { await navigator.clipboard.writeText(json); toast("已复制到剪贴板"); }
+    catch (_) { return toast("剪贴板不可用，请用「下载文件」"); }
+  } else {
+    const blob = new Blob([json], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `sshmanager-export-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  closeModal($("#modal-export"));
+}
+
+// 导入：支持 {groups, sessions} 或旧的会话数组
 async function importFromText(text) {
-  let items;
-  try {
-    items = JSON.parse(text);
-    if (!Array.isArray(items)) items = [items];
-  } catch (_) { return toast("JSON 解析失败"); }
-  const res = await api("/api/sessions/import", { method: "POST", body: { sessions: items } });
-  toast(`导入完成：新增 ${res.added}，跳过 ${res.skipped}，共 ${res.total}`);
+  let data;
+  try { data = JSON.parse(text); } catch (_) { return toast("JSON 解析失败"); }
+  let payload;
+  if (Array.isArray(data)) payload = { sessions: data };
+  else if (data && Array.isArray(data.sessions)) payload = { groups: data.groups || [], sessions: data.sessions };
+  else return toast("格式不正确：应为会话数组或 {groups, sessions}");
+  const res = await api("/api/import", { method: "POST", body: payload });
+  toast(`导入完成：分组 ${res.groups_added}，会话新增 ${res.added}，跳过 ${res.skipped}`);
   closeModal($("#modal-import"));
   await loadAll();
 }
@@ -822,7 +868,11 @@ $("#n-auth").addEventListener("change", toggleAuth);
 $("#n-submit").addEventListener("click", submitNew);
 $("#n-name").addEventListener("keydown", (e) => { if (e.key === "Enter") submitNew(); });
 
-$("#btn-export").addEventListener("click", doExport);
+$("#btn-export").addEventListener("click", openExportModal);
+$("#exp-clipboard").addEventListener("click", () => doExport("clipboard"));
+$("#exp-file").addEventListener("click", () => doExport("file"));
+$("#exp-groups-all").addEventListener("click", () => toggleAllExport("#exp-groups"));
+$("#exp-sessions-all").addEventListener("click", () => toggleAllExport("#exp-sessions"));
 $("#btn-import").addEventListener("click", () => { openModal($("#modal-import")); $("#i-text").focus(); });
 $("#i-submit").addEventListener("click", () => importFromText($("#i-text").value));
 $("#i-file").addEventListener("click", () => $("#i-file-input").click());

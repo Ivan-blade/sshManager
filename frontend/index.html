@@ -117,12 +117,32 @@
     </div>
   </div>
 
+  <!-- 导出会话/分组 -->
+  <div id="modal-export" class="modal hidden">
+    <div class="modal-box">
+      <h3>导出</h3>
+      <div class="exp-section">
+        <div class="exp-head"><span>分组</span><button id="exp-groups-all" class="link-btn">全选</button></div>
+        <div id="exp-groups" class="exp-list"></div>
+      </div>
+      <div class="exp-section">
+        <div class="exp-head"><span>会话</span><button id="exp-sessions-all" class="link-btn">全选</button></div>
+        <div id="exp-sessions" class="exp-list"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>取消</button>
+        <button id="exp-clipboard" class="btn ghost">复制到剪贴板</button>
+        <button id="exp-file" class="btn primary">下载文件</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 导入会话 -->
   <div id="modal-import" class="modal hidden">
     <div class="modal-box">
-      <h3>导入会话</h3>
-      <p class="hint">从剪贴板粘贴 JSON，或选择文件：</p>
-      <textarea id="i-text" placeholder='[{"name":"host","transport":"ssh","host":"1.2.3.4","username":"root"}]'></textarea>
+      <h3>导入</h3>
+      <p class="hint">支持 <code>{groups, sessions}</code> 或旧的会话数组。从剪贴板粘贴或选择文件：</p>
+      <textarea id="i-text" placeholder='{"groups":[{"name":"生产"}],"sessions":[{"name":"host","host":"1.2.3.4","username":"root"}]}'></textarea>
       <div class="modal-actions">
         <button class="btn ghost" data-close>取消</button>
         <button id="i-file" class="btn ghost">从文件导入</button>

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .deps import get_manager
-from .routes import ai, groups, sessions, sftp, terminal
+from .routes import ai, groups, sessions, sftp, terminal, transfer
 
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ app.include_router(ai.router)
 app.include_router(ai.conn_router)
 app.include_router(ai.capabilities_router)
 app.include_router(sftp.router)
+app.include_router(transfer.router)
 
 # 前端静态资源（xterm.js 本地化，离线可用）
 if config.FRONTEND_DIR.exists():
