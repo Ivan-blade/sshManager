@@ -943,35 +943,15 @@ async function loadQuick() {
 }
 
 function renderQuick() {
-  const gbox = $("#quick-groups");
-  gbox.innerHTML = "";
-  const allBtn = document.createElement("button");
-  allBtn.className = "quick-group" + (state.quickActiveGroup === null ? " active" : "");
-  allBtn.textContent = "全部";
-  allBtn.addEventListener("click", () => { state.quickActiveGroup = null; renderQuick(); });
-  gbox.append(allBtn);
-  for (const g of state.quickGroups) {
-    const btn = document.createElement("button");
-    btn.className = "quick-group" + (state.quickActiveGroup === g.id ? " active" : "");
-    btn.textContent = g.name;
-    btn.addEventListener("click", () => { state.quickActiveGroup = g.id; renderQuick(); });
-    btn.addEventListener("contextmenu", (e) => {
-      e.preventDefault(); e.stopPropagation();
-      showCtx(e.clientX, e.clientY, [
-        { label: "重命名分组", action: "quickRenameGroup" },
-        { label: "删除分组", action: "quickDeleteGroup", danger: true },
-      ]);
-      state.ctxTarget = { type: "quickGroup", id: g.id, name: g.name };
-    });
-    gbox.append(btn);
-  }
+  const active = state.quickGroups.find((g) => g.id === state.quickActiveGroup);
+  $("#quick-group-btn").textContent = (active ? active.name : "全部") + " ▾";
 
   const cbox = $("#quick-cmds");
   cbox.innerHTML = "";
   const cmds = state.quickCommands.filter((c) =>
     state.quickActiveGroup === null || c.group_id === state.quickActiveGroup);
   if (!cmds.length) {
-    cbox.innerHTML = '<span class="quick-empty">（右键分组/＋可增删，点命令发送到终端）</span>';
+    cbox.innerHTML = '<span class="quick-empty">（无命令，点右侧 ＋ 命令 添加）</span>';
     return;
   }
   for (const c of cmds) {
@@ -990,6 +970,66 @@ function renderQuick() {
     });
     cbox.append(btn);
   }
+}
+
+function hideQuickMenu() { $("#quick-group-menu").classList.add("hidden"); }
+
+function toggleQuickGroupMenu() {
+  const menu = $("#quick-group-menu");
+  if (!menu.classList.contains("hidden")) { hideQuickMenu(); return; }
+  menu.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "qgm-head"; head.textContent = "分组";
+  menu.append(head);
+
+  const addRow = (gid, label, isAll) => {
+    const row = document.createElement("div");
+    row.className = "qgm-item" + (state.quickActiveGroup === gid ? " active" : "");
+    const nm = document.createElement("span");
+    nm.className = "qgm-name"; nm.textContent = label;
+    row.append(nm);
+    row.addEventListener("click", () => { state.quickActiveGroup = gid; renderQuick(); hideQuickMenu(); });
+    if (!isAll) {
+      const rn = document.createElement("button");
+      rn.className = "icon-btn small"; rn.textContent = "✎"; rn.title = "重命名分组";
+      rn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        hideQuickMenu();
+        promptModal("重命名分组", label, async (v) => {
+          if (v) { await api(`/api/quick/groups/${gid}`, { method: "PATCH", body: { name: v } }); await loadQuick(); }
+        });
+      });
+      const del = document.createElement("button");
+      del.className = "icon-btn small danger"; del.textContent = "✕"; del.title = "删除分组";
+      del.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await api(`/api/quick/groups/${gid}`, { method: "DELETE" });
+        if (state.quickActiveGroup === gid) state.quickActiveGroup = null;
+        await loadQuick();
+        hideQuickMenu();
+      });
+      row.append(rn, del);
+    }
+    menu.append(row);
+  };
+
+  addRow(null, "全部", true);
+  for (const g of state.quickGroups) addRow(g.id, g.name, false);
+
+  const foot = document.createElement("button");
+  foot.className = "qgm-new"; foot.textContent = "＋ 新建分组";
+  foot.addEventListener("click", () => {
+    hideQuickMenu();
+    promptModal("新建分组", "", async (v) => {
+      if (v) { await api("/api/quick/groups", { method: "POST", body: { name: v } }); await loadQuick(); }
+    });
+  });
+  menu.append(foot);
+
+  const qb = $("#quickbar").getBoundingClientRect();
+  menu.style.left = qb.left + "px";
+  menu.style.bottom = (window.innerHeight - qb.top + 4) + "px";
+  menu.classList.remove("hidden");
 }
 
 function runQuickCommand(cmd) {
@@ -1122,6 +1162,10 @@ $("#quick-add-group").addEventListener("click", () => promptModal("新建分组"
   if (v) { await api("/api/quick/groups", { method: "POST", body: { name: v } }); await loadQuick(); }
 }));
 $("#quick-add-cmd").addEventListener("click", () => openQuickCmdModal(null));
+$("#quick-group-btn").addEventListener("click", toggleQuickGroupMenu);
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#quick-group-menu") && !e.target.closest("#quick-group-btn")) hideQuickMenu();
+});
 $("#qc-ok").addEventListener("click", submitQuickCmd);
 $("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter") submitQuickCmd(); });
 $("#sftp-close").addEventListener("click", closeSftp);

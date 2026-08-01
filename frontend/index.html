@@ -73,14 +73,17 @@
         </div>
         <!-- 快捷命令栏 -->
         <section id="quickbar">
-          <div class="quick-head">
-            <span class="quick-title">快捷命令</span>
-            <div id="quick-groups" class="quick-groups"></div>
-            <span class="spacer"></span>
-            <button id="quick-add-group" class="icon-btn" title="新建分组">＋</button>
-            <button id="quick-add-cmd" class="icon-btn" title="新建命令">＋</button>
+          <div class="quickbar-inner">
+            <div class="quick-left">
+              <span class="quick-title">快捷命令</span>
+              <button id="quick-group-btn" class="quick-group-btn">全部 ▾</button>
+              <button id="quick-add-group" class="icon-btn" title="新建分组">＋</button>
+            </div>
+            <div class="quick-right">
+              <div id="quick-cmds" class="quick-cmds"></div>
+              <button id="quick-add-cmd" class="btn small quick-add-cmd" title="新建命令">＋ 命令</button>
+            </div>
           </div>
-          <div id="quick-cmds" class="quick-cmds"></div>
         </section>
       </main>
     </div>
@@ -213,6 +216,9 @@
       </div>
     </div>
   </div>
+
+  <!-- 快捷分组下拉（上拉） -->
+  <div id="quick-group-menu" class="quick-group-menu hidden"></div>
 
   <!-- 右键菜单 -->
   <div id="ctxmenu" class="ctxmenu hidden"></div>
