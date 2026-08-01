@@ -1,0 +1,13 @@
+{
+  "name": "sshmanager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "人机协作的 SSH 工具（xshell 增强版）",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.7.0"
+  }
+}
