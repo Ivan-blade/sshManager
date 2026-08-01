@@ -944,16 +944,12 @@ async function loadQuick() {
 
 function renderQuick() {
   const active = state.quickGroups.find((g) => g.id === state.quickActiveGroup);
-  $("#quick-group-btn").textContent = (active ? active.name : "全部") + " ▾";
+  $("#quick-group-btn").textContent = (active ? active.name : "默认分组") + " ▾";
 
   const cbox = $("#quick-cmds");
   cbox.innerHTML = "";
   const cmds = state.quickCommands.filter((c) =>
     state.quickActiveGroup === null || c.group_id === state.quickActiveGroup);
-  if (!cmds.length) {
-    cbox.innerHTML = '<span class="quick-empty">（无命令，点右侧 ＋ 命令 添加）</span>';
-    return;
-  }
   for (const c of cmds) {
     const btn = document.createElement("button");
     btn.className = "quick-cmd";
@@ -1013,7 +1009,7 @@ function toggleQuickGroupMenu() {
     menu.append(row);
   };
 
-  addRow(null, "全部", true);
+  addRow(null, "默认分组", true);
   for (const g of state.quickGroups) addRow(g.id, g.name, false);
 
   const foot = document.createElement("button");
@@ -1158,9 +1154,6 @@ $("#filter").addEventListener("input", () => {
 $("#btn-new").addEventListener("click", openNewModal);
 $("#empty-new").addEventListener("click", openNewModal);
 $("#btn-add-group").addEventListener("click", () => promptModal("新建分组", "", (v) => createGroup(v)));
-$("#quick-add-group").addEventListener("click", () => promptModal("新建分组", "", async (v) => {
-  if (v) { await api("/api/quick/groups", { method: "POST", body: { name: v } }); await loadQuick(); }
-}));
 $("#quick-add-cmd").addEventListener("click", () => openQuickCmdModal(null));
 $("#quick-group-btn").addEventListener("click", toggleQuickGroupMenu);
 document.addEventListener("click", (e) => {
