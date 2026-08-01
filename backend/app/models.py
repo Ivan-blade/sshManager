@@ -38,6 +38,26 @@ class GroupUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=64)
 
 
+class QuickGroupCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64)
+
+
+class QuickGroupUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=64)
+
+
+class QuickCommandCreate(BaseModel):
+    group_id: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=64)
+    command: str = Field(..., min_length=1, max_length=1024)
+
+
+class QuickCommandUpdate(BaseModel):
+    group_id: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=64)
+    command: Optional[str] = Field(None, min_length=1, max_length=1024)
+
+
 class TerminalInput(BaseModel):
     """向共享终端写入的数据（AI 干涉 / 注入）。"""
     data: str

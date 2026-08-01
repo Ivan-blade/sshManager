@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import config
 from .deps import get_manager
-from .routes import ai, groups, sessions, sftp, terminal, transfer
+from .routes import ai, groups, quick, sessions, sftp, terminal, transfer
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.add_middleware(
 
 app.include_router(sessions.router)
 app.include_router(groups.router)
+app.include_router(quick.router)
 app.include_router(terminal.router)
 app.include_router(ai.router)
 app.include_router(ai.conn_router)

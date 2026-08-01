@@ -42,14 +42,46 @@
         <div id="tabbar">
           <div id="tabs" class="tabs"></div>
         </div>
-        <div id="terminal-wrap" class="hidden">
-          <div id="terminal"></div>
+        <div id="main-body">
+          <div id="term-col">
+            <div id="terminal-wrap" class="hidden">
+              <div id="terminal"></div>
+            </div>
+            <div id="empty-state">
+              <div class="empty-glyph">⎇</div>
+              <p>在左侧选择一个会话，打开终端</p>
+              <button id="empty-new" class="btn primary">＋ 新建会话</button>
+            </div>
+          </div>
+          <!-- SFTP 文件面板 -->
+          <aside id="sftp-panel" class="hidden">
+            <div class="sftp-head">
+              <span class="sftp-title">SFTP · <span id="sftp-name"></span></span>
+              <button id="sftp-close" class="icon-btn" title="关闭">✕</button>
+            </div>
+            <div class="sftp-pathbar">
+              <input id="sftp-path" value="." spellcheck="false">
+              <button id="sftp-go" class="btn small" title="前往">前往</button>
+              <button id="sftp-up" class="btn small" title="上级目录">↑</button>
+            </div>
+            <div id="sftp-list" class="sftp-list"></div>
+            <div class="sftp-actions">
+              <button id="sftp-upload" class="btn small">上传文件</button>
+              <input type="file" id="sftp-file-input" class="hidden">
+            </div>
+          </aside>
         </div>
-        <div id="empty-state">
-          <div class="empty-glyph">⎇</div>
-          <p>在左侧选择一个会话，打开终端</p>
-          <button id="empty-new" class="btn primary">＋ 新建会话</button>
-        </div>
+        <!-- 快捷命令栏 -->
+        <section id="quickbar">
+          <div class="quick-head">
+            <span class="quick-title">快捷命令</span>
+            <div id="quick-groups" class="quick-groups"></div>
+            <span class="spacer"></span>
+            <button id="quick-add-group" class="icon-btn" title="新建分组">＋</button>
+            <button id="quick-add-cmd" class="icon-btn" title="新建命令">＋</button>
+          </div>
+          <div id="quick-cmds" class="quick-cmds"></div>
+        </section>
       </main>
     </div>
   </div>
@@ -133,6 +165,22 @@
         <button class="btn ghost" data-close>取消</button>
         <button id="exp-clipboard" class="btn ghost">复制到剪贴板</button>
         <button id="exp-file" class="btn primary">下载文件</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快捷命令 -->
+  <div id="modal-quick" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="qc-title">新建命令</h3>
+      <label>分组
+        <select id="qc-group"></select>
+      </label>
+      <label>名称 <input id="qc-name" placeholder="例如：查看内存" autocomplete="off"></label>
+      <label>命令 <input id="qc-command" placeholder="例如：free -h" autocomplete="off"></label>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>取消</button>
+        <button id="qc-ok" class="btn primary">确定</button>
       </div>
     </div>
   </div>

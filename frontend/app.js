@@ -15,6 +15,11 @@ const state = {
   selectedId: null,  // 列表选中（单击）
   activeKey: null,   // 当前激活 tab 的 key
   editingSid: null,  // 正在编辑的会话 id（null=新建）
+  quickGroups: [],
+  quickCommands: [],
+  quickActiveGroup: null,
+  sftpSid: null,   // 当前 SFTP 面板所属会话
+  sftpPath: ".",
   term: null,
   fit: null,
   ws: null,
@@ -187,6 +192,10 @@ function _sessionNode(s, style) {
   // hover 操作按钮：编辑 / 删除
   const act = document.createElement("span");
   act.className = "sess-actions";
+  const sftpBtn = document.createElement("button");
+  sftpBtn.className = "icon-btn small sftp-folder"; sftpBtn.title = "SFTP 文件";
+  sftpBtn.textContent = "📁";
+  sftpBtn.addEventListener("click", (e) => { e.stopPropagation(); openSftp(s.id); });
   const editBtn = document.createElement("button");
   editBtn.className = "icon-btn small"; editBtn.title = "编辑会话";
   editBtn.textContent = "✎";
@@ -202,7 +211,7 @@ function _sessionNode(s, style) {
     await loadAll();
     refreshStatuses();
   });
-  act.append(editBtn, delBtn);
+  act.append(sftpBtn, editBtn, delBtn);
 
   li.append(st, meta, act);
   return li;
@@ -312,6 +321,11 @@ function activateTab(key) {
   $("#empty-state").classList.add("hidden");
   $("#terminal-wrap").classList.remove("hidden");
   setupTerminal(key);
+  // SFTP 面板跟随活动 tab 的会话
+  if (!$("#sftp-panel").classList.contains("hidden")) {
+    const sid = activeSid();
+    if (sid && sid !== state.sftpSid) openSftp(sid);
+  }
 }
 
 function closeTab(key) {
@@ -526,6 +540,22 @@ async function runCtxAction(action) {
     if (!confirm(`删除分组「${t.name}」？组内会话将回到根层级。`)) return;
     await api(`/api/groups/${t.id}`, { method: "DELETE" });
     await loadAll();
+  }
+  else if (action === "quickRenameGroup" && t.type === "quickGroup") promptModal("重命名分组", t.name, async (v) => {
+    if (v) { await api(`/api/quick/groups/${t.id}`, { method: "PATCH", body: { name: v } }); await loadQuick(); }
+  });
+  else if (action === "quickDeleteGroup" && t.type === "quickGroup") {
+    await api(`/api/quick/groups/${t.id}`, { method: "DELETE" });
+    if (state.quickActiveGroup === t.id) state.quickActiveGroup = null;
+    await loadQuick();
+  }
+  else if (action === "quickEditCmd" && t.type === "quickCmd") {
+    const cmd = state.quickCommands.find((x) => x.id === t.id);
+    if (cmd) openQuickCmdModal(cmd);
+  }
+  else if (action === "quickDeleteCmd" && t.type === "quickCmd") {
+    await api(`/api/quick/commands/${t.id}`, { method: "DELETE" });
+    await loadQuick();
   }
   else if (action === "newInGroup" && t.type === "group") {
     populateGroupSelect();
@@ -901,6 +931,179 @@ function toggleBgPanel() {
 function hideBgPanel() { $("#bg-panel").classList.add("hidden"); }
 
 // ==========================================================================
+// 快捷命令（终端底部栏）
+// ==========================================================================
+async function loadQuick() {
+  const [groups, commands] = await Promise.all([
+    api("/api/quick/groups"), api("/api/quick/commands"),
+  ]);
+  state.quickGroups = groups;
+  state.quickCommands = commands;
+  renderQuick();
+}
+
+function renderQuick() {
+  const gbox = $("#quick-groups");
+  gbox.innerHTML = "";
+  const allBtn = document.createElement("button");
+  allBtn.className = "quick-group" + (state.quickActiveGroup === null ? " active" : "");
+  allBtn.textContent = "全部";
+  allBtn.addEventListener("click", () => { state.quickActiveGroup = null; renderQuick(); });
+  gbox.append(allBtn);
+  for (const g of state.quickGroups) {
+    const btn = document.createElement("button");
+    btn.className = "quick-group" + (state.quickActiveGroup === g.id ? " active" : "");
+    btn.textContent = g.name;
+    btn.addEventListener("click", () => { state.quickActiveGroup = g.id; renderQuick(); });
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      showCtx(e.clientX, e.clientY, [
+        { label: "重命名分组", action: "quickRenameGroup" },
+        { label: "删除分组", action: "quickDeleteGroup", danger: true },
+      ]);
+      state.ctxTarget = { type: "quickGroup", id: g.id, name: g.name };
+    });
+    gbox.append(btn);
+  }
+
+  const cbox = $("#quick-cmds");
+  cbox.innerHTML = "";
+  const cmds = state.quickCommands.filter((c) =>
+    state.quickActiveGroup === null || c.group_id === state.quickActiveGroup);
+  if (!cmds.length) {
+    cbox.innerHTML = '<span class="quick-empty">（右键分组/＋可增删，点命令发送到终端）</span>';
+    return;
+  }
+  for (const c of cmds) {
+    const btn = document.createElement("button");
+    btn.className = "quick-cmd";
+    btn.textContent = c.name;
+    btn.title = c.command;
+    btn.addEventListener("click", () => runQuickCommand(c));
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      showCtx(e.clientX, e.clientY, [
+        { label: "编辑", action: "quickEditCmd" },
+        { label: "删除", action: "quickDeleteCmd", danger: true },
+      ]);
+      state.ctxTarget = { type: "quickCmd", id: c.id, name: c.name };
+    });
+    cbox.append(btn);
+  }
+}
+
+function runQuickCommand(cmd) {
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return toast("没有活动的终端连接");
+  state.ws.send(JSON.stringify({ type: "input", data: (cmd.command || "") + "\n" }));
+}
+
+let editingQuickCmdId = null;
+function openQuickCmdModal(cmd) {
+  editingQuickCmdId = cmd ? cmd.id : null;
+  $("#qc-title").textContent = cmd ? "编辑命令" : "新建命令";
+  const sel = $("#qc-group");
+  sel.innerHTML = '<option value="">未分组</option>';
+  for (const g of state.quickGroups) {
+    const o = document.createElement("option");
+    o.value = g.id; o.textContent = g.name;
+    sel.append(o);
+  }
+  $("#qc-name").value = cmd ? cmd.name : "";
+  $("#qc-command").value = cmd ? cmd.command : "";
+  sel.value = cmd ? (cmd.group_id || "") : (state.quickActiveGroup || "");
+  openModal($("#modal-quick"));
+}
+
+async function submitQuickCmd() {
+  const name = $("#qc-name").value.trim();
+  const command = $("#qc-command").value.trim();
+  if (!name || !command) return toast("名称和命令不能为空");
+  const body = { name, command, group_id: $("#qc-group").value || null };
+  if (editingQuickCmdId) await api(`/api/quick/commands/${editingQuickCmdId}`, { method: "PATCH", body });
+  else await api("/api/quick/commands", { method: "POST", body });
+  editingQuickCmdId = null;
+  closeModal($("#modal-quick"));
+  await loadQuick();
+}
+
+// ==========================================================================
+// SFTP 文件面板
+// ==========================================================================
+async function openSftp(sid) {
+  if (state.sftpSid !== sid) { state.sftpSid = sid; state.sftpPath = "."; }
+  $("#sftp-panel").classList.remove("hidden");
+  const s = sessionById(sid);
+  $("#sftp-name").textContent = s ? s.name : "";
+  await loadSftp();
+}
+
+function closeSftp() {
+  $("#sftp-panel").classList.add("hidden");
+  state.sftpSid = null;
+}
+
+function parentPath(p) {
+  if (!p || p === ".") return ".";
+  if (p === "/") return "/";
+  const parts = p.split("/").filter(Boolean);
+  parts.pop();
+  return parts.length ? "/" + parts.join("/") : "/";
+}
+
+function fmtSize(n) {
+  if (n == null) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1024 / 1024).toFixed(1) + " MB";
+}
+
+async function loadSftp() {
+  if (!state.sftpSid) return;
+  const list = $("#sftp-list");
+  list.innerHTML = '<div class="sftp-loading">加载中…</div>';
+  $("#sftp-path").value = state.sftpPath;
+  let entries = [];
+  try {
+    entries = await api(`/api/sessions/${state.sftpSid}/sftp/ls?path=${encodeURIComponent(state.sftpPath)}`);
+  } catch (e) { list.innerHTML = `<div class="sftp-empty">加载失败：${e.message}</div>`; return; }
+  list.innerHTML = "";
+  if (!entries.length) { list.innerHTML = '<div class="sftp-empty">（空目录）</div>'; return; }
+  for (const e of entries) {
+    const row = document.createElement("div");
+    row.className = "sftp-item" + (e.is_dir ? " dir" : "");
+    const icon = document.createElement("span");
+    icon.className = "sftp-icon"; icon.textContent = e.is_dir ? "▸" : "·";
+    const nm = document.createElement("span");
+    nm.className = "sftp-name"; nm.textContent = e.name;
+    const sz = document.createElement("span");
+    sz.className = "sftp-size"; sz.textContent = e.is_dir ? "" : fmtSize(e.size);
+    row.append(icon, nm, sz);
+    if (e.is_dir) {
+      row.addEventListener("dblclick", () => { state.sftpPath = e.path; loadSftp(); });
+    } else {
+      const dl = document.createElement("button");
+      dl.className = "btn small sftp-dl"; dl.textContent = "下载";
+      dl.addEventListener("click", (ev) => { ev.stopPropagation(); downloadSftp(e.path); });
+      row.append(dl);
+    }
+    list.append(row);
+  }
+}
+
+function downloadSftp(path) {
+  window.open(`/api/sessions/${state.sftpSid}/sftp/download?path=${encodeURIComponent(path)}`);
+}
+
+async function uploadSftp(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("target_dir", state.sftpPath);
+  const resp = await fetch(`/api/sessions/${state.sftpSid}/sftp/upload`, { method: "POST", body: fd });
+  if (!resp.ok) { const d = await resp.json().catch(() => ({})); toast("上传失败：" + (d.detail || resp.status)); return; }
+  await loadSftp();
+}
+
+// ==========================================================================
 // 事件绑定
 // ==========================================================================
 let filterTimer = null;
@@ -915,6 +1118,22 @@ $("#filter").addEventListener("input", () => {
 $("#btn-new").addEventListener("click", openNewModal);
 $("#empty-new").addEventListener("click", openNewModal);
 $("#btn-add-group").addEventListener("click", () => promptModal("新建分组", "", (v) => createGroup(v)));
+$("#quick-add-group").addEventListener("click", () => promptModal("新建分组", "", async (v) => {
+  if (v) { await api("/api/quick/groups", { method: "POST", body: { name: v } }); await loadQuick(); }
+}));
+$("#quick-add-cmd").addEventListener("click", () => openQuickCmdModal(null));
+$("#qc-ok").addEventListener("click", submitQuickCmd);
+$("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter") submitQuickCmd(); });
+$("#sftp-close").addEventListener("click", closeSftp);
+$("#sftp-up").addEventListener("click", () => { state.sftpPath = parentPath(state.sftpPath); loadSftp(); });
+$("#sftp-go").addEventListener("click", () => { state.sftpPath = $("#sftp-path").value || "."; loadSftp(); });
+$("#sftp-path").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#sftp-go").click(); });
+$("#sftp-upload").addEventListener("click", () => $("#sftp-file-input").click());
+$("#sftp-file-input").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (f) uploadSftp(f);
+  e.target.value = "";
+});
 $("#btn-bg").addEventListener("click", (e) => { e.stopPropagation(); toggleBgPanel(); });
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#bg-panel") && !e.target.closest("#btn-bg")) hideBgPanel();
@@ -954,4 +1173,5 @@ $("#i-cancel").addEventListener("click", () => closeModal($("#modal-import")));
 
 // 启动
 loadAll();
+loadQuick();
 setInterval(refreshStatuses, 10000);

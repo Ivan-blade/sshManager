@@ -263,6 +263,32 @@ def test_export_import_bundle(client):
         client.delete(f"/api/groups/{gid}")
 
 
+def test_quick_commands_crud(client):
+    """快捷命令：分组 + 命令 增删查改。"""
+    g = client.post("/api/quick/groups", json={"name": f"qg-{int(time.time()*1000)}"})
+    assert g.status_code == 200, g.text
+    gid = g.json()["id"]
+    try:
+        c = client.post("/api/quick/commands", json={"group_id": gid, "name": "内存", "command": "free -h"})
+        assert c.status_code == 200, c.text
+        cid = c.json()["id"]
+        # 更新
+        u = client.patch(f"/api/quick/commands/{cid}", json={"name": "内存2", "command": "free -m"})
+        assert u.json()["command"] == "free -m"
+        # 移动到未分组
+        u2 = client.patch(f"/api/quick/commands/{cid}", json={"group_id": None})
+        assert u2.json()["group_id"] is None
+        # 列表
+        assert any(x["id"] == cid for x in client.get("/api/quick/commands").json())
+        # 删除分组（命令回未分组）
+        assert client.delete(f"/api/quick/groups/{gid}").json()["ok"] is True
+        assert client.get(f"/api/quick/commands").json()[0]["group_id"] is None
+        # 删命令
+        assert client.delete(f"/api/quick/commands/{cid}").json()["ok"] is True
+    finally:
+        client.delete(f"/api/quick/groups/{gid}")
+
+
 def test_ai_capabilities(client):
     """AI 能力发现：概述 + 详情 + 未知 404。"""
     o = client.get("/api/ai/capabilities").json()

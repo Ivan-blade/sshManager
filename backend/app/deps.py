@@ -2,6 +2,7 @@
 from functools import lru_cache
 
 from . import config
+from .quickstore import QuickStore
 from .sessions import SessionManager
 from .store import SessionStore
 
@@ -9,6 +10,11 @@ from .store import SessionStore
 @lru_cache
 def get_store() -> SessionStore:
     return SessionStore(config.SESSIONS_FILE, config.GROUPS_FILE)
+
+
+@lru_cache
+def get_quick_store() -> QuickStore:
+    return QuickStore(config.QUICK_FILE)
 
 
 @lru_cache
