@@ -255,7 +255,15 @@ body {
 }
 .sftp-searchbar input:focus { border-color: var(--accent); }
 .sftp-list.dragging { outline: 1px dashed var(--accent); background: var(--accent-soft); }
-.modal-box textarea.fe-textarea { height: 320px; }
+#modal-file-edit .modal-box { width: 660px; }
+#modal-file-edit .fe-textarea {
+  height: 440px;
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 12px;
+  tab-size: 4;
+}
+#modal-file-edit .fe-path { margin-bottom: 8px; word-break: break-all; }
 
 /* 快捷命令栏（终端底部） */
 #quickbar {
