@@ -42,6 +42,15 @@ python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requir
 cd frontend && npm install
 ```
 
+## Restore a Background Session (demo)
+
+Closing a tab only detaches the page — the SSH connection keeps running in the background (output keeps accumulating). Reopen the app and bring the session back with one click:
+
+![Restoring a background SSH session](ssh_recover.gif)
+
+- Open **◔ Background** in the top bar — every background connection across all sessions is listed here, with its session name + host. Click a row to restore it into a tab.
+- **Sessions created by the AI work the same way**: when the AI opens a connection on a session it created (or any session), that connection shows up in the background list and can be restored just like a human-created one.
+
 ## Tech Stack
 
 | Layer      | Tech                                   |

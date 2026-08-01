@@ -42,6 +42,15 @@ python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requir
 cd frontend && npm install
 ```
 
+## 后台会话恢复（演示）
+
+关闭 tab 只是 detach 页面 —— SSH 连接继续在后台运行，输出持续累积。重新打开应用即可一键恢复：
+
+![恢复后台 SSH 会话](ssh_recover.gif)
+
+- 打开顶栏「◔ Background」—— 这里列出**所有跨会话的后台连接**（含会话名 + 主机）；点击整行即可恢复到 tab。
+- **AI 创建的会话同理**：AI 在它创建的会话（或任何会话）上打开的连接，同样会出现在后台列表里，与人创建的会话一样可一键恢复。
+
 ## 技术栈
 
 | 层      | 技术                                  |
