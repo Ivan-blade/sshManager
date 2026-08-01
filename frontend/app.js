@@ -1315,7 +1315,13 @@ async function sftpSearch() {
     const icon = document.createElement("span"); icon.className = "sftp-icon"; icon.textContent = "·";
     const nm = document.createElement("span"); nm.className = "sftp-name"; nm.textContent = p;
     row.append(icon, nm);
-    row.addEventListener("dblclick", () => downloadSftp(p));
+    // 单击跳转到该文件所在目录（搜索即定位）
+    row.addEventListener("click", () => {
+      const dir = p.lastIndexOf("/") > 0 ? p.slice(0, p.lastIndexOf("/")) : ".";
+      $("#sftp-search").value = "";
+      state.sftpPath = dir;
+      loadSftp();
+    });
     row.addEventListener("contextmenu", (ev) => { ev.preventDefault(); showFileMenu(ev, p); });
     list.append(row);
   }
