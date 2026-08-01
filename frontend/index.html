@@ -10,28 +10,21 @@
 </head>
 <body>
   <div id="app">
-    <!-- 顶栏 -->
-    <header id="toolbar">
-      <div class="brand">
-        <span class="brand-mark">›</span>
-        <span class="brand-name">sshManager</span>
-      </div>
-      <div class="toolbar-actions">
-        <button id="btn-new" class="btn primary">＋ 新建会话</button>
-        <button id="btn-import" class="btn ghost">导入</button>
-        <button id="btn-export" class="btn ghost">导出</button>
-      </div>
-    </header>
-
     <div id="body">
       <!-- 左侧会话面板 -->
       <aside id="panel">
-        <div class="panel-head">
-          <span class="panel-title">会话</span>
-          <button id="btn-add-group" class="icon-btn" title="新建分组">＋</button>
+        <div class="brand">
+          <span class="brand-mark">›</span>
+          <span class="brand-name">sshManager</span>
+        </div>
+        <div class="panel-actions">
+          <button id="btn-new" class="btn primary">＋ 新建</button>
+          <button id="btn-import" class="btn ghost">导入</button>
+          <button id="btn-export" class="btn ghost">导出</button>
         </div>
         <div class="panel-search">
           <input id="filter" type="text" placeholder="搜索名称 / IP…">
+          <button id="btn-add-group" class="icon-btn" title="新建分组">＋</button>
         </div>
         <nav id="tree" class="tree"></nav>
       </aside>

@@ -9,6 +9,7 @@ const state = {
   expanded: new Set(),
   statuses: {},      // sid -> "on" | "off" | "err"
   tabs: [],          // [{id, name}]
+  selectedId: null,  // 列表选中（单击）
   activeId: null,
   term: null,
   fit: null,
@@ -126,7 +127,8 @@ function _groupNode(g, items, style) {
 
 function _sessionNode(s, style) {
   const li = document.createElement("li");
-  li.className = "tree-item sess-item" + (s.id === state.activeId ? " active" : "");
+  li.className = "tree-item sess-item"
+    + (s.id === state.activeId ? " active" : s.id === state.selectedId ? " selected" : "");
   li.style.cssText = style;
   li.dataset.sid = s.id;
   const dot = document.createElement("span");
@@ -144,7 +146,8 @@ function _sessionNode(s, style) {
     : `${s.username}@${s.host}:${s.port}`;
   meta.append(name, host);
 
-  li.addEventListener("click", () => openSession(s.id));
+  li.addEventListener("click", () => selectSession(s.id));           // 单击选中
+  li.addEventListener("dblclick", () => openSession(s.id));          // 双击打开（xshell 语义）
   li.addEventListener("contextmenu", (e) => {
     e.preventDefault(); e.stopPropagation();
     showCtx(e.clientX, e.clientY, [
@@ -158,6 +161,11 @@ function _sessionNode(s, style) {
 
   li.append(dot, meta);
   return li;
+}
+
+function selectSession(id) {
+  state.selectedId = id;
+  renderTree();
 }
 
 function setDot(sid, cls) {
