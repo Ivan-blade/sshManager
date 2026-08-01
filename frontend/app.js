@@ -622,8 +622,24 @@ document.addEventListener("keydown", (e) => {
 // ==========================================================================
 // 弹窗
 // ==========================================================================
-function openModal(el) { el.classList.remove("hidden"); }
+function openModal(el) {
+  el.classList.remove("hidden");
+  // 每个弹窗统一加右上角 ✕ 关闭按钮
+  const box = el.querySelector(".modal-box");
+  if (box && !box.querySelector(".modal-x")) {
+    const x = document.createElement("button");
+    x.className = "modal-x";
+    x.textContent = "✕";
+    x.title = "Close";
+    x.addEventListener("click", () => closeModal(el));
+    box.appendChild(x);
+  }
+}
 function closeModal(el) { el.classList.add("hidden"); }
+// 点击弹窗非弹框区域（backdrop）收起
+document.addEventListener("click", (e) => {
+  if (e.target.classList && e.target.classList.contains("modal")) closeModal(e.target);
+});
 document.querySelectorAll("[data-close]").forEach((b) =>
   b.addEventListener("click", () => closeModal(b.closest(".modal"))));
 
@@ -1131,13 +1147,7 @@ function renderQuickMenu() {
     e.stopPropagation();
     newBtn.replaceWith(buildInlineGroupInput()); // 行内新增，不弹窗
   });
-  const expBtn = document.createElement("button");
-  expBtn.className = "qgm-foot-btn"; expBtn.textContent = "Export";
-  expBtn.addEventListener("click", (e) => { e.stopPropagation(); hideQuickMenu(); openQuickExportModal(); });
-  const impBtn = document.createElement("button");
-  impBtn.className = "qgm-foot-btn"; impBtn.textContent = "Import";
-  impBtn.addEventListener("click", (e) => { e.stopPropagation(); hideQuickMenu(); openQuickImportModal(); });
-  foot.append(newBtn, expBtn, impBtn);
+  foot.append(newBtn);
   menu.append(foot);
 }
 
@@ -1523,6 +1533,8 @@ $("#n-submit").addEventListener("click", submitNew);
 $("#n-name").addEventListener("keydown", (e) => { if (e.key === "Enter") submitNew(); });
 
 $("#btn-export").addEventListener("click", openExportModal);
+$("#btn-q-export").addEventListener("click", openQuickExportModal);
+$("#btn-q-import").addEventListener("click", openQuickImportModal);
 $("#exp-clipboard").addEventListener("click", () => doExport("clipboard"));
 $("#exp-file").addEventListener("click", () => doExport("file"));
 $("#exp-groups-all").addEventListener("click", () => toggleAllExport("#exp-groups"));
