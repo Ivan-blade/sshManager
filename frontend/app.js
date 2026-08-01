@@ -14,6 +14,7 @@ const state = {
   tabKey: 0,         // tab 唯一 key 递增器
   selectedId: null,  // 列表选中（单击）
   activeKey: null,   // 当前激活 tab 的 key
+  editingSid: null,  // 正在编辑的会话 id（null=新建）
   term: null,
   fit: null,
   ws: null,
@@ -183,7 +184,28 @@ function _sessionNode(s, style) {
     state.ctxTarget = { type: "session", id: s.id, name: s.name };
   });
 
-  li.append(st, meta);
+  // hover 操作按钮：编辑 / 删除
+  const act = document.createElement("span");
+  act.className = "sess-actions";
+  const editBtn = document.createElement("button");
+  editBtn.className = "icon-btn small"; editBtn.title = "编辑会话";
+  editBtn.textContent = "✎";
+  editBtn.addEventListener("click", (e) => { e.stopPropagation(); openEditModal(s.id); });
+  const delBtn = document.createElement("button");
+  delBtn.className = "icon-btn small danger"; delBtn.title = "删除会话";
+  delBtn.textContent = "✕";
+  delBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!confirm(`删除会话「${s.name}」？`)) return;
+    await api(`/api/sessions/${s.id}`, { method: "DELETE" });
+    const tab = state.tabs.find((x) => x.sid === s.id);
+    if (tab) closeTab(tab.key);
+    await loadAll();
+    refreshStatuses();
+  });
+  act.append(editBtn, delBtn);
+
+  li.append(st, meta, act);
   return li;
 }
 
@@ -610,7 +632,7 @@ async function submitNew() {
   const body = {
     name,
     transport: $("#n-transport").value,
-    group_id: $("#n-group").value || undefined,
+    group_id: $("#n-group").value || null,
     description: $("#n-desc").value.trim() || undefined,
   };
   if (isSsh) {
@@ -619,23 +641,68 @@ async function submitNew() {
       port: parseInt($("#n-port").value, 10) || 22,
       username: $("#n-user").value.trim() || "root",
       auth_type: $("#n-auth").value,
-      password: $("#n-auth").value === "password" ? $("#n-password").value : undefined,
-      key_path: $("#n-auth").value === "key" ? $("#n-key").value.trim() : undefined,
     });
+    if (state.editingSid) {
+      // 编辑：密码/密钥留空表示不修改
+      if ($("#n-auth").value === "password") { if ($("#n-password").value) body.password = $("#n-password").value; }
+      else { if ($("#n-key").value.trim()) body.key_path = $("#n-key").value.trim(); }
+    } else {
+      body.password = $("#n-auth").value === "password" ? $("#n-password").value : undefined;
+      body.key_path = $("#n-auth").value === "key" ? $("#n-key").value.trim() : undefined;
+    }
   }
-  await api("/api/sessions", { method: "POST", body });
+  if (state.editingSid) {
+    await api(`/api/sessions/${state.editingSid}`, { method: "PATCH", body });
+    state.tabs.forEach((tb) => { if (tb.sid === state.editingSid) tb.name = name; });
+  } else {
+    await api("/api/sessions", { method: "POST", body });
+  }
+  state.editingSid = null;
   closeModal($("#modal-new"));
-  $("#n-name").value = "";
   await loadAll();
+  renderTabs();
 }
 
 function toast(msg) { alert(msg); }
 
 function openNewModal() {
+  state.editingSid = null;
+  $("#n-title").textContent = "新建会话";
+  $("#n-submit").textContent = "创建";
   populateGroupSelect();
   toggleNewFields();
-  $("#n-name").value = "";
+  ["#n-name", "#n-desc", "#n-password", "#n-key"].forEach((s) => $(s).value = "");
+  $("#n-host").value = "localhost";
+  $("#n-port").value = "22";
+  $("#n-user").value = "root";
+  $("#n-auth").value = "password";
+  $("#n-group").value = "";
   openModal($("#modal-new"));
+  $("#n-name").focus();
+}
+
+function openEditModal(sid) {
+  const s = sessionById(sid);
+  if (!s) return;
+  state.editingSid = sid;
+  $("#n-title").textContent = "编辑会话";
+  $("#n-submit").textContent = "保存";
+  populateGroupSelect();
+  $("#n-name").value = s.name || "";
+  $("#n-desc").value = s.description || "";
+  $("#n-group").value = s.group_id || "";
+  $("#n-transport").value = s.transport || "ssh";
+  if (s.transport === "ssh") {
+    $("#n-host").value = s.host || "localhost";
+    $("#n-port").value = s.port || 22;
+    $("#n-user").value = s.username || "root";
+    $("#n-auth").value = s.auth_type || "password";
+    $("#n-password").value = "";
+    $("#n-key").value = s.key_path || "";
+  }
+  toggleNewFields();
+  openModal($("#modal-new"));
+  $("#n-name").focus();
 }
 
 // 分组
@@ -744,7 +811,6 @@ $("#filter").addEventListener("input", () => {
 });
 
 $("#btn-new").addEventListener("click", openNewModal);
-$("#btn-new-tab").addEventListener("click", openNewModal);
 $("#empty-new").addEventListener("click", openNewModal);
 $("#btn-add-group").addEventListener("click", () => promptModal("新建分组", "", (v) => createGroup(v)));
 $("#btn-bg").addEventListener("click", (e) => { e.stopPropagation(); toggleBgPanel(); });
