@@ -1003,7 +1003,7 @@ function buildInlineGroupInput() {
     if (e.key === "Enter") commit();
     else if (e.key === "Escape") renderQuickMenu();
   });
-  ok.addEventListener("click", commit);
+  ok.addEventListener("click", (e) => { e.stopPropagation(); commit(); });
   row.append(input, ok);
   setTimeout(() => input.focus(), 0);
   return row;
@@ -1027,7 +1027,7 @@ function buildInlineGroupEdit(gid, currentName) {
     if (e.key === "Enter") commit();
     else if (e.key === "Escape") renderQuickMenu();
   });
-  ok.addEventListener("click", commit);
+  ok.addEventListener("click", (e) => { e.stopPropagation(); commit(); });
   row.append(input, ok);
   setTimeout(() => input.focus(), 0);
   return row;
@@ -1073,7 +1073,12 @@ function renderQuickMenu() {
 
   const foot = document.createElement("button");
   foot.className = "qgm-new"; foot.textContent = "＋ 新建分组";
-  foot.addEventListener("click", () => foot.replaceWith(buildInlineGroupInput())); // 行内新增，不弹窗
+  foot.addEventListener("click", (e) => {
+    // 关键：replaceWith 会把按钮从 DOM 移除，导致后续冒泡到 document 的
+    // 「点外部关闭」处理器把 e.target.closest 判断成 null（parentNode 已空）→ 误关菜单
+    e.stopPropagation();
+    foot.replaceWith(buildInlineGroupInput()); // 行内新增，不弹窗
+  });
   menu.append(foot);
 }
 
