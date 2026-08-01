@@ -1,5 +1,5 @@
 // sshManager Electron 壳：启动时拉起 Python 后端，等待就绪后加载前端。
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog, session } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -48,6 +48,14 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // 下载：弹出原生 macOS 保存对话框（默认下载目录）
+  session.defaultSession.on('will-download', (event, item) => {
+    event.preventDefault();
+    dialog.showSaveDialog({ defaultPath: item.getFilename() }).then((r) => {
+      if (!r.canceled && r.filePath) item.setSavePath(r.filePath);
+      item.resume();
+    });
+  });
   startBackend();
   const ok = await waitForBackend();
   if (!ok) {

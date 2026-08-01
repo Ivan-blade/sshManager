@@ -1375,7 +1375,13 @@ async function loadSftp() {
 }
 
 function downloadSftp(path) {
-  window.open(`/api/sessions/${state.sftpSid}/sftp/download?path=${encodeURIComponent(path)}`);
+  // 用隐藏 <a download> 触发下载，避免 window.open 在 Electron 里开空白窗口
+  const a = document.createElement("a");
+  a.href = `/api/sessions/${state.sftpSid}/sftp/download?path=${encodeURIComponent(path)}`;
+  a.download = path.split("/").pop() || "download";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function uploadSftp(file) {
