@@ -92,7 +92,8 @@ body {
 /* 顶部功能页导航 */
 #topnav {
   height: 48px;
-  display: flex; align-items: center; gap: 24px;
+  display: flex; align-items: center;
+  position: relative;
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
   background: rgba(17, 20, 28, 0.7);
@@ -100,7 +101,10 @@ body {
   flex-shrink: 0;
 }
 #topnav .brand { padding: 0; }
-.topnav-items { display: flex; gap: 4px; }
+.topnav-items {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px;
+}
 .topnav-item {
   padding: 5px 14px;
   border: none; border-radius: var(--radius-sm);
