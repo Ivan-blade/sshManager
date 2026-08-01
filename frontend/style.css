@@ -273,7 +273,7 @@ body {
   white-space: nowrap; transition: all var(--transition);
 }
 .quick-cmd:hover { border-color: var(--accent); color: var(--accent-strong); }
-.quick-right .quick-add-cmd { flex-shrink: 0; }
+.quick-add-cmd { flex-shrink: 0; }
 
 /* 分组上拉菜单 */
 .quick-group-menu {

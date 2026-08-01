@@ -946,25 +946,40 @@ function renderQuick() {
   const active = state.quickGroups.find((g) => g.id === state.quickActiveGroup);
   $("#quick-group-btn").textContent = (active ? active.name : "默认分组") + " ▾";
 
+  // 移除旧的 +（动态放置）
+  document.querySelectorAll("#quickbar .quick-add-cmd").forEach((b) => b.remove());
+
   const cbox = $("#quick-cmds");
   cbox.innerHTML = "";
   const cmds = state.quickCommands.filter((c) =>
     state.quickActiveGroup === null || c.group_id === state.quickActiveGroup);
-  for (const c of cmds) {
-    const btn = document.createElement("button");
-    btn.className = "quick-cmd";
-    btn.textContent = c.name;
-    btn.title = c.command;
-    btn.addEventListener("click", () => runQuickCommand(c));
-    btn.addEventListener("contextmenu", (e) => {
-      e.preventDefault(); e.stopPropagation();
-      showCtx(e.clientX, e.clientY, [
-        { label: "编辑", action: "quickEditCmd" },
-        { label: "删除", action: "quickDeleteCmd", danger: true },
-      ]);
-      state.ctxTarget = { type: "quickCmd", id: c.id, name: c.name };
-    });
-    cbox.append(btn);
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "icon-btn quick-add-cmd";
+  addBtn.title = "新建命令";
+  addBtn.textContent = "＋";
+  addBtn.addEventListener("click", () => openQuickCmdModal(null));
+
+  if (cmds.length) {
+    for (const c of cmds) {
+      const btn = document.createElement("button");
+      btn.className = "quick-cmd";
+      btn.textContent = c.name;
+      btn.title = c.command;
+      btn.addEventListener("click", () => runQuickCommand(c));
+      btn.addEventListener("contextmenu", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showCtx(e.clientX, e.clientY, [
+          { label: "编辑", action: "quickEditCmd" },
+          { label: "删除", action: "quickDeleteCmd", danger: true },
+        ]);
+        state.ctxTarget = { type: "quickCmd", id: c.id, name: c.name };
+      });
+      cbox.append(btn);
+    }
+    cbox.append(addBtn); // 有命令：+ 放在命令最右
+  } else {
+    $("#quick-group-btn").after(addBtn); // 无命令：+ 放在分组按钮右边
   }
 }
 
@@ -1198,7 +1213,6 @@ $("#filter").addEventListener("input", () => {
 $("#btn-new").addEventListener("click", openNewModal);
 $("#empty-new").addEventListener("click", openNewModal);
 $("#btn-add-group").addEventListener("click", () => promptModal("新建分组", "", (v) => createGroup(v)));
-$("#quick-add-cmd").addEventListener("click", () => openQuickCmdModal(null));
 $("#quick-group-btn").addEventListener("click", toggleQuickGroupMenu);
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#quick-group-menu") && !e.target.closest("#quick-group-btn")) hideQuickMenu();
