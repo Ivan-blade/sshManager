@@ -1,7 +1,8 @@
-"""快捷命令：分组 + 命令 CRUD。"""
+"""快捷命令：分组 + 命令 CRUD + 导入导出。"""
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from ..deps import get_quick_store
 from ..models import (QuickCommandCreate, QuickCommandUpdate,
@@ -10,6 +11,28 @@ from ..quickstore import QuickStore
 
 router = APIRouter(prefix="/api/quick", tags=["quick"])
 QuickDep = Annotated[QuickStore, Depends(get_quick_store)]
+
+
+class QuickExportRequest(BaseModel):
+    group_ids: list[str] = []
+    command_ids: list[str] = []
+
+
+class QuickImportRequest(BaseModel):
+    groups: list[dict] = []
+    commands: list[dict] = []
+
+
+@router.post("/export")
+def export_bundle(body: QuickExportRequest, store: QuickDep) -> dict:
+    """按选择导出分组与命令；空选择=全部。"""
+    return store.export_bundle(body.group_ids, body.command_ids)
+
+
+@router.post("/import")
+def import_bundle(body: QuickImportRequest, store: QuickDep) -> dict:
+    """统一导入 {groups, commands}；分组按名称去重复用，命令重写 group_id。"""
+    return store.import_bundle(body.groups, body.commands)
 
 
 # ---- 分组 ----

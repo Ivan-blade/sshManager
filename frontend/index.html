@@ -236,6 +236,55 @@
     </div>
   </div>
 
+  <!-- 快捷命令导出 -->
+  <div id="modal-q-export" class="modal hidden">
+    <div class="modal-box">
+      <h3>Export Quick Commands</h3>
+      <div class="exp-section">
+        <div class="exp-head"><span>Groups</span><button id="qexp-groups-all" class="link-btn">Select All</button></div>
+        <div id="qexp-groups" class="exp-list"></div>
+      </div>
+      <div class="exp-section">
+        <div class="exp-head"><span>Commands</span><button id="qexp-commands-all" class="link-btn">Select All</button></div>
+        <div id="qexp-commands" class="exp-list"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="qexp-clipboard" class="btn ghost">Copy to Clipboard</button>
+        <button id="qexp-file" class="btn primary">Download File</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快捷命令导入 -->
+  <div id="modal-q-import" class="modal hidden">
+    <div class="modal-box">
+      <h3>Import Quick Commands</h3>
+      <div id="qimp-drop" class="drop-zone">
+        <p class="dz-hint">Drop JSON file here, or load from:</p>
+        <div class="dz-actions">
+          <button id="qimp-clipboard" class="btn ghost">From Clipboard</button>
+          <button id="qimp-file" class="btn ghost">Choose File</button>
+        </div>
+      </div>
+      <input type="file" id="qimp-file-input" class="hidden" accept=".json,application/json">
+      <div id="qimp-preview" class="hidden">
+        <div class="exp-section">
+          <div class="exp-head"><span>Groups</span></div>
+          <div id="qimp-groups" class="exp-list"></div>
+        </div>
+        <div class="exp-section">
+          <div class="exp-head"><span>Commands</span></div>
+          <div id="qimp-commands" class="exp-list"></div>
+        </div>
+        <div class="modal-actions">
+          <button id="qimp-cancel" class="btn ghost">Cancel</button>
+          <button id="qimp-confirm" class="btn primary">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 快捷分组下拉（上拉） -->
   <div id="quick-group-menu" class="quick-group-menu hidden"></div>
 

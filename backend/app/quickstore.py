@@ -101,3 +101,48 @@ class QuickStore:
             del self._commands[cid]
             self._save()
             return True
+
+    # ---------------- 导入 / 导出 ----------------
+    def export_bundle(self, group_ids: list[str], command_ids: list[str]) -> dict:
+        groups = self.list_groups()
+        commands = self.list_commands()
+        if group_ids:
+            groups = [g for g in groups if g["id"] in group_ids]
+        if command_ids:
+            commands = [c for c in commands if c["id"] in command_ids]
+        return {"groups": groups, "commands": commands}
+
+    def import_bundle(self, groups: list[dict], commands: list[dict]) -> dict:
+        """分组按名称去重复用；命令重写 group_id 映射。"""
+        gid_map: dict[str, str] = {}
+        group_added = 0
+        for g in groups:
+            if not isinstance(g, dict) or not g.get("name"):
+                continue
+            existing = next(
+                (x for x in self.list_groups() if (x.get("name") or "").lower() == g["name"].lower()),
+                None,
+            )
+            if existing:
+                gid_map[g.get("id")] = existing["id"]
+            else:
+                ng = self.create_group(g["name"])
+                gid_map[g.get("id")] = ng["id"]
+                group_added += 1
+        added = skipped = 0
+        with self._lock:
+            for c in commands:
+                if not isinstance(c, dict) or not c.get("name") or not c.get("command"):
+                    continue
+                if c.get("id") in self._commands:
+                    skipped += 1
+                    continue
+                rec = {"id": uuid.uuid4().hex, "name": c["name"], "command": c["command"],
+                       "sort": len(self._commands), "created_at": int(time.time())}
+                old_gid = c.get("group_id")
+                rec["group_id"] = gid_map.get(old_gid) if old_gid and old_gid in gid_map else None
+                self._commands[rec["id"]] = rec
+                added += 1
+            self._save()
+        return {"groups_added": group_added, "added": added, "skipped": skipped,
+                "total": len(self._commands)}

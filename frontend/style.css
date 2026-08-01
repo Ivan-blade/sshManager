@@ -308,11 +308,13 @@ body {
   background: var(--bg); color: var(--text); font-size: 12px; font-family: inherit; outline: none;
 }
 .qgm-input input:focus { border-color: var(--accent); }
-.qgm-new {
-  width: 100%; padding: 8px; border: none; border-top: 1px solid var(--border);
-  background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; font-family: inherit;
+.qgm-foot { display: flex; border-top: 1px solid var(--border); }
+.qgm-foot .qgm-new, .qgm-foot .qgm-foot-btn {
+  flex: 1; padding: 8px; border: none; background: transparent;
+  color: var(--accent); font-size: 12px; cursor: pointer; font-family: inherit;
+  white-space: nowrap;
 }
-.qgm-new:hover { background: var(--accent-soft); }
+.qgm-foot .qgm-new:hover, .qgm-foot .qgm-foot-btn:hover { background: var(--accent-soft); }
 #filter {
   width: 100%;
   padding: 7px 11px;

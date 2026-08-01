@@ -1121,14 +1121,23 @@ function renderQuickMenu() {
   addRow(null, "默认分组", true);
   for (const g of state.quickGroups) addRow(g.id, g.name, false);
 
-  const foot = document.createElement("button");
-  foot.className = "qgm-new"; foot.textContent = "＋ 新建分组";
-  foot.addEventListener("click", (e) => {
+  const foot = document.createElement("div");
+  foot.className = "qgm-foot";
+  const newBtn = document.createElement("button");
+  newBtn.className = "qgm-new"; newBtn.textContent = "＋ New Group";
+  newBtn.addEventListener("click", (e) => {
     // 关键：replaceWith 会把按钮从 DOM 移除，导致后续冒泡到 document 的
     // 「点外部关闭」处理器把 e.target.closest 判断成 null（parentNode 已空）→ 误关菜单
     e.stopPropagation();
-    foot.replaceWith(buildInlineGroupInput()); // 行内新增，不弹窗
+    newBtn.replaceWith(buildInlineGroupInput()); // 行内新增，不弹窗
   });
+  const expBtn = document.createElement("button");
+  expBtn.className = "qgm-foot-btn"; expBtn.textContent = "Export";
+  expBtn.addEventListener("click", (e) => { e.stopPropagation(); hideQuickMenu(); openQuickExportModal(); });
+  const impBtn = document.createElement("button");
+  impBtn.className = "qgm-foot-btn"; impBtn.textContent = "Import";
+  impBtn.addEventListener("click", (e) => { e.stopPropagation(); hideQuickMenu(); openQuickImportModal(); });
+  foot.append(newBtn, expBtn, impBtn);
   menu.append(foot);
 }
 
@@ -1181,6 +1190,104 @@ async function submitQuickCmd() {
   else await api("/api/quick/commands", { method: "POST", body });
   editingQuickCmdId = null;
   closeModal($("#modal-quick"));
+  await loadQuick();
+}
+
+// ==========================================================================
+// 快捷命令导入 / 导出
+// ==========================================================================
+function renderQuickExportList(sel, items, type) {
+  const box = $(sel);
+  box.innerHTML = "";
+  if (!items.length) { box.innerHTML = '<div class="exp-empty">(none)</div>'; return; }
+  for (const it of items) {
+    const label = document.createElement("label");
+    label.className = "exp-item";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = it.id; cb.checked = true;
+    label.append(cb);
+    const nm = document.createElement("span"); nm.textContent = it.name;
+    label.append(nm);
+    if (type === "command_ids") {
+      const hs = document.createElement("span"); hs.className = "exp-host"; hs.textContent = it.command || "";
+      label.append(hs);
+    }
+    box.append(label);
+  }
+}
+
+function openQuickExportModal() {
+  renderQuickExportList("#qexp-groups", state.quickGroups, "group_ids");
+  renderQuickExportList("#qexp-commands", state.quickCommands, "command_ids");
+  openModal($("#modal-q-export"));
+}
+
+async function doQuickExport(mode) {
+  const body = {
+    group_ids: [...document.querySelectorAll("#qexp-groups input:checked")].map((e) => e.value),
+    command_ids: [...document.querySelectorAll("#qexp-commands input:checked")].map((e) => e.value),
+  };
+  const data = await api("/api/quick/export", { method: "POST", body });
+  const json = JSON.stringify(data, null, 2);
+  if (mode === "clipboard") {
+    try { await navigator.clipboard.writeText(json); }
+    catch (_) { return toast("Clipboard unavailable, use Download File"); }
+  } else {
+    const blob = new Blob([json], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `quick-commands-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  closeModal($("#modal-q-export"));
+}
+
+let qImportData = null;
+function openQuickImportModal() {
+  qImportData = null;
+  $("#qimp-preview").classList.add("hidden");
+  $("#qimp-groups").innerHTML = "";
+  $("#qimp-commands").innerHTML = "";
+  openModal($("#modal-q-import"));
+}
+
+function loadQuickImportText(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (_) { return toast("Invalid JSON"); }
+  if (!data || !Array.isArray(data.commands)) return toast("Format: {groups, commands}");
+  qImportData = data;
+  renderQuickImportPreview(data);
+}
+
+function renderQuickImportPreview(data) {
+  const gb = $("#qimp-groups"); gb.innerHTML = "";
+  (data.groups || []).forEach((g, i) => {
+    if (!g || !g.name) return;
+    const l = document.createElement("label"); l.className = "exp-item";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = i;
+    const nm = document.createElement("span"); nm.textContent = g.name;
+    l.append(cb, nm); gb.append(l);
+  });
+  const cbox = $("#qimp-commands"); cbox.innerHTML = "";
+  (data.commands || []).forEach((c, i) => {
+    if (!c || !c.name) return;
+    const l = document.createElement("label"); l.className = "exp-item";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = i;
+    const nm = document.createElement("span"); nm.textContent = c.name;
+    l.append(cb, nm); cbox.append(l);
+  });
+  $("#qimp-preview").classList.remove("hidden");
+}
+
+async function confirmQuickImport() {
+  if (!qImportData) return;
+  const groups = (qImportData.groups || []).filter((_, i) =>
+    document.querySelector(`#qimp-groups input[data-idx="${i}"]`)?.checked !== false);
+  const commands = (qImportData.commands || []).filter((_, i) =>
+    document.querySelector(`#qimp-commands input[data-idx="${i}"]`)?.checked !== false);
+  await api("/api/quick/import", { method: "POST", body: { groups, commands } });
+  closeModal($("#modal-q-import"));
   await loadQuick();
 }
 
@@ -1350,6 +1457,31 @@ $("#quick-group-btn").addEventListener("click", toggleQuickGroupMenu);
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#quick-group-menu") && !e.target.closest("#quick-group-btn")) hideQuickMenu();
 });
+$("#qexp-groups-all").addEventListener("click", () => toggleAllExport("#qexp-groups"));
+$("#qexp-commands-all").addEventListener("click", () => toggleAllExport("#qexp-commands"));
+$("#qexp-clipboard").addEventListener("click", () => doQuickExport("clipboard"));
+$("#qexp-file").addEventListener("click", () => doQuickExport("file"));
+$("#qimp-clipboard").addEventListener("click", async () => {
+  let text;
+  try { text = await navigator.clipboard.readText(); } catch (_) { return toast("Clipboard unavailable"); }
+  loadQuickImportText(text);
+});
+$("#qimp-file").addEventListener("click", () => $("#qimp-file-input").click());
+$("#qimp-file-input").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (f) { const rd = new FileReader(); rd.onload = () => loadQuickImportText(rd.result); rd.readAsText(f); }
+  e.target.value = "";
+});
+$("#qimp-drop").addEventListener("dragover", (e) => { e.preventDefault(); $("#qimp-drop").classList.add("dragging"); });
+$("#qimp-drop").addEventListener("dragleave", () => $("#qimp-drop").classList.remove("dragging"));
+$("#qimp-drop").addEventListener("drop", (e) => {
+  e.preventDefault();
+  $("#qimp-drop").classList.remove("dragging");
+  const f = e.dataTransfer.files[0];
+  if (f) { const rd = new FileReader(); rd.onload = () => loadQuickImportText(rd.result); rd.readAsText(f); }
+});
+$("#qimp-confirm").addEventListener("click", confirmQuickImport);
+$("#qimp-cancel").addEventListener("click", () => closeModal($("#modal-q-import")));
 $("#qc-ok").addEventListener("click", submitQuickCmd);
 $("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitQuickCmd(); });
 $("#tab-sftp").addEventListener("click", () => {
