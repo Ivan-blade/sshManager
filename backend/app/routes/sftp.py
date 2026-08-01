@@ -7,6 +7,7 @@ import shutil
 import stat
 from pathlib import Path
 from typing import Annotated, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -20,6 +21,11 @@ router = APIRouter(prefix="/api/sessions/{sid}/sftp", tags=["sftp"])
 StoreDep = Annotated[SessionStore, Depends(get_store)]
 
 CHUNK = 65536
+
+
+def _disposition(fname: str) -> str:
+    """Content-Disposition，支持非 ASCII 文件名（RFC 5987 filename*）。"""
+    return f"attachment; filename=\"download\"; filename*=UTF-8''{quote(fname)}"
 
 
 class SftpDeleteRequest(BaseModel):
@@ -96,7 +102,7 @@ async def sftp_download(sid: str, store: StoreDep, path: str) -> StreamingRespon
                 while chunk := f.read(CHUNK):
                     yield chunk
         return StreamingResponse(iter_local(), media_type="application/octet-stream",
-                                 headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+                                 headers={"Content-Disposition": _disposition(fname)})
 
     sftp = await transport.conn.start_sftp_client()  # type: ignore[attr-defined]
 
@@ -117,7 +123,7 @@ async def sftp_download(sid: str, store: StoreDep, path: str) -> StreamingRespon
             await transport.close()
 
     return StreamingResponse(iter_sftp(), media_type="application/octet-stream",
-                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+                             headers={"Content-Disposition": _disposition(fname)})
 
 
 @router.post("/upload")

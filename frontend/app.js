@@ -1397,7 +1397,6 @@ function showFileMenu(e, path) {
 }
 
 async function deleteSftp(path) {
-  if (!confirm(`Delete "${path}"?`)) return;
   try {
     await api(`/api/sessions/${state.sftpSid}/sftp/delete`, { method: "POST", body: { path } });
   } catch (e) { return toast("Delete failed: " + e.message); }
