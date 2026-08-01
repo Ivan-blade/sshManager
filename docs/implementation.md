@@ -90,7 +90,10 @@ class Transport:
 ### 2.4 路由
 
 **terminal.py — WS 协议**：
-- 每个 ws 连接 = **一个独立终端连接**：`manager.create(sid)` → `connect()` → `await attach(ws)`（加入 readers + 发缓冲尾）→ `send status`（含 conn_id）。ws 关闭即 `manager.remove(conn_id)` 释放。
+- 两个路由：
+  - `/ws/terminal/{sid}` 新建独立连接：`manager.create(sid)` → `connect()` → `await attach(ws)`（发缓冲尾）→ `send status`。
+  - `/ws/connection/{conn_id}` 恢复到后台保活连接（拉回前台）。
+- **关闭语义**：ws 关闭**只 detach，不自动断开**——连接后台保活（SSH 不断、缓冲继续累积）。真正断开走 `POST /api/connections/{conn_id}/disconnect`（前端「断开并关闭」）；关闭程序由 lifespan `manager.shutdown()` 终止所有。
 - 客户端 → 服务端：`{"type":"input","data"}`、`{"type":"resize","cols","rows"}`。
 - 服务端 → 客户端：`{"type":"status","state","conn_id"}`、`{"type":"buffer","data"}`（历史尾）、`{"type":"output","data"}`。
 - 连接失败（如 SSH 认证失败）→ 发 `status:error` 并 close(1011)。

@@ -113,10 +113,41 @@ def test_terminal_ws_and_ai_write(client, local_session):
         b3 = client.get(f"/api/connections/{conn_id}/buffer", params={"since": 10**9}).json()
         assert b3["gap"] is True
 
-    # ws 关闭后该连接应已释放
+    # ws 关闭后连接转为后台保活（SSH 不断）
     time.sleep(0.3)
     st = client.get(f"/api/sessions/{local_session}/status").json()
-    assert st["active_conns"] == []
+    assert conn_id in st["background_conns"]
+    # 显式断开清理
+    client.post(f"/api/connections/{conn_id}/disconnect")
+
+
+def test_background_keepalive_and_restore(client, local_session):
+    """关 ws → 后台保活；/ws/connection 恢复；断开后清除。"""
+    with client.websocket_connect(f"/ws/terminal/{local_session}") as ws:
+        while True:
+            m = ws.receive_json()
+            if m["type"] == "status":
+                conn_id = m["conn_id"]
+                break
+    time.sleep(0.3)
+    st = client.get(f"/api/sessions/{local_session}/status").json()
+    assert conn_id in st["background_conns"], "关闭页面后连接应后台保活"
+
+    # 恢复：ws 连到 /ws/connection/{conn_id}
+    with client.websocket_connect(f"/ws/connection/{conn_id}") as ws2:
+        seen = {}
+        while not ({"buffer", "status"} <= seen.keys()):
+            m = ws2.receive_json()
+            seen[m["type"]] = m
+        assert seen["status"]["conn_id"] == conn_id
+    time.sleep(0.3)
+    st2 = client.get(f"/api/sessions/{local_session}/status").json()
+    assert conn_id in st2["background_conns"], "再次关闭后仍在后台"
+
+    # 断开 → 清除
+    assert client.post(f"/api/connections/{conn_id}/disconnect").json()["ok"] is True
+    st3 = client.get(f"/api/sessions/{local_session}/status").json()
+    assert conn_id not in st3["active_conns"]
 
 
 def test_session_id_unique_per_host(client):

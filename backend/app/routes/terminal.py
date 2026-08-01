@@ -1,13 +1,16 @@
 """终端 WebSocket 流。
 
-每个 ws 连接都会为会话配置创建**一个独立的终端连接**（自己的 pty/SSH 通道 + 缓冲）。
-同一会话可同时存在多个独立连接（多 tab / 多 AI 连接互不影响）。
+- `/ws/terminal/{sid}`      新建一个独立连接（每个 tab / 每次打开）
+- `/ws/connection/{conn_id}` 恢复到已有连接（前台恢复后台保活的 SSH）
+
+**关闭语义**：ws 关闭只 detach，不自动断开——连接保持后台保活。
+真正断开走 `POST /api/connections/{conn_id}/disconnect`（前端「断开并关闭」）。
+关闭程序时由后端 lifespan shutdown 终止所有连接。
 
 协议（JSON）：
   浏览器 -> 服务端: {"type":"input","data":str} | {"type":"resize","cols":n,"rows":n}
-  服务端 -> 浏览器: {"type":"status","state","conn_id"?, "message"?} |
-                    {"type":"buffer","data":str} |
-                    {"type":"output","data":str}
+  服务端 -> 浏览器: {"type":"status","state","conn_id"?,"message"?} |
+                    {"type":"buffer","data":str} | {"type":"output","data":str}
 """
 import asyncio
 from typing import Annotated
@@ -16,7 +19,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from ..deps import get_manager, get_store
-from ..sessions import SessionManager
+from ..sessions import SessionManager, TerminalSession
 from ..store import SessionStore
 
 router = APIRouter(tags=["terminal"])
@@ -24,32 +27,14 @@ ManagerDep = Annotated[SessionManager, Depends(get_manager)]
 StoreDep = Annotated[SessionStore, Depends(get_store)]
 
 
-@router.websocket("/ws/terminal/{sid}")
-async def terminal_ws(ws: WebSocket, sid: str, manager: ManagerDep, store: StoreDep) -> None:
-    await ws.accept()
-    if not store.get(sid):
-        await ws.send_json({"type": "status", "state": "error", "message": "session not found"})
-        await ws.close(code=1011)
-        return
+async def _send_error(ws: WebSocket, message: str) -> None:
+    await ws.send_json({"type": "status", "state": "error", "message": message})
+    await ws.close(code=1011)
 
-    ts = manager.create(sid)  # 每次连接建一个独立终端实例
-    if ts is None:
-        await ws.send_json({"type": "status", "state": "error", "message": "session not found"})
-        await ws.close(code=1011)
-        return
 
-    try:
-        await ts.connect()
-    except asyncio.CancelledError:
-        await manager.remove(ts.id)
-        raise
-    except Exception as exc:
-        await ws.send_json({"type": "status", "state": "error", "message": f"connect failed: {exc}"})
-        await manager.remove(ts.id)
-        await ws.close(code=1011)
-        return
-
-    await ts.attach(ws)  # 加入 readers + 发送当前缓冲尾
+async def _attach_and_loop(ws: WebSocket, ts: TerminalSession) -> None:
+    """把 ws 挂到连接上，跑消息循环；关闭时仅 detach（连接后台保活）。"""
+    await ts.attach(ws)  # 加入 readers + 发送缓冲尾（历史）
     await ws.send_json({"type": "status", "state": "connected", "conn_id": ts.id})
     try:
         while True:
@@ -70,5 +55,38 @@ async def terminal_ws(ws: WebSocket, sid: str, manager: ManagerDep, store: Store
     except (ValidationError, KeyError, ValueError):
         pass  # 忽略畸形消息
     finally:
-        ts.detach(ws)
-        await manager.remove(ts.id)  # 连接结束即释放该独立实例
+        ts.detach(ws)  # 仅关闭页面：连接保活，不自动断开
+
+
+@router.websocket("/ws/terminal/{sid}")
+async def terminal_ws(ws: WebSocket, sid: str, manager: ManagerDep, store: StoreDep) -> None:
+    """新建一个独立连接。"""
+    await ws.accept()
+    if not store.get(sid):
+        await _send_error(ws, "session not found")
+        return
+    ts = manager.create(sid)
+    if ts is None:
+        await _send_error(ws, "session not found")
+        return
+    try:
+        await ts.connect()
+    except asyncio.CancelledError:
+        await manager.remove(ts.id)
+        raise
+    except Exception as exc:
+        await manager.remove(ts.id)
+        await _send_error(ws, f"connect failed: {exc}")
+        return
+    await _attach_and_loop(ws, ts)
+
+
+@router.websocket("/ws/connection/{conn_id}")
+async def connection_ws(ws: WebSocket, conn_id: str, manager: ManagerDep) -> None:
+    """恢复到已有连接（后台保活的 SSH 拉回前台）。"""
+    await ws.accept()
+    ts = manager.get(conn_id)
+    if not ts or not ts.connected:
+        await _send_error(ws, "connection not found or closed")
+        return
+    await _attach_and_loop(ws, ts)

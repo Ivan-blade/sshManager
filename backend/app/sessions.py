@@ -178,7 +178,13 @@ class SessionManager:
         return any(ts.connected for ts in self._sessions.values() if ts.sid == sid)
 
     def active_conns(self, sid: str) -> list[str]:
+        """全部存活连接（含挂在页面上的 + 后台保活的）。"""
         return [ts.id for ts in self._sessions.values() if ts.sid == sid and ts.connected]
+
+    def background_conns(self, sid: str) -> list[str]:
+        """后台保活连接：SSH 存活但没有页面/ws 挂着。"""
+        return [ts.id for ts in self._sessions.values()
+                if ts.sid == sid and ts.connected and not ts.readers]
 
     async def disconnect_sid(self, sid: str) -> None:
         for ts in list(self._sessions.values()):

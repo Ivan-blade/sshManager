@@ -103,4 +103,5 @@ async def session_status(sid: str, store: StoreDep, manager: ManagerDep) -> dict
         "id": sid,
         "connected": manager.is_connected(sid),
         "active_conns": manager.active_conns(sid),
+        "background_conns": manager.background_conns(sid),
     }

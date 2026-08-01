@@ -8,7 +8,8 @@ const state = {
   filter: "",
   expanded: new Set(),
   statuses: {},      // sid -> "on" | "off" | "err"
-  tabs: [],          // [{key, sid, name}] —— key 唯一，同一会话可开多个 tab
+  bg: {},            // sid -> 后台保活连接 conn_id 数组
+  tabs: [],          // [{key, sid, name, connId, mode}] mode: "new"|"restore"
   tabKey: 0,         // tab 唯一 key 递增器
   selectedId: null,  // 列表选中（单击）
   activeKey: null,   // 当前激活 tab 的 key
@@ -152,20 +153,36 @@ function _sessionNode(s, style) {
     : `${s.username}@${s.host}:${s.port}`;
   meta.append(name, host);
 
+  const badge = document.createElement("span");
+  badge.className = "sess-badge hidden";
+  badge.dataset.badge = s.id;
+  badge.textContent = "后台运行";
+
   li.addEventListener("click", () => selectSession(s.id));           // 单击选中
-  li.addEventListener("dblclick", () => openSession(s.id));          // 双击打开（xshell 语义）
+  li.addEventListener("dblclick", () => openSession(s.id));          // 双击：有后台则恢复，否则新建
   li.addEventListener("contextmenu", (e) => {
     e.preventDefault(); e.stopPropagation();
-    showCtx(e.clientX, e.clientY, [
+    const bg = state.bg[s.id] || [];
+    const items = [
       { label: "打开", action: "open" },
+    ];
+    if (bg.length) {
+      items.push(
+        { label: "恢复到后台连接", action: "restoreBg" },
+        { label: "断开后台连接", action: "disconnectBg" },
+      );
+    }
+    items.push(
+      { label: "以新连接打开", action: "openNew" },
       { label: "移动到分组…", action: "move" },
       { label: "重命名", action: "renameSession" },
       { label: "删除", action: "deleteSession", danger: true },
-    ]);
+    );
+    showCtx(e.clientX, e.clientY, items);
     state.ctxTarget = { type: "session", id: s.id, name: s.name };
   });
 
-  li.append(dot, meta);
+  li.append(dot, meta, badge);
   return li;
 }
 
@@ -185,6 +202,9 @@ async function refreshStatuses() {
     try {
       const st = await api(`/api/sessions/${s.id}/status`);
       setDot(s.id, st.connected ? "on" : "off");
+      state.bg[s.id] = st.background_conns || [];
+      const badge = document.querySelector(`[data-badge="${s.id}"]`);
+      if (badge) badge.classList.toggle("hidden", state.bg[s.id].length === 0);
     } catch (_) { setDot(s.id, "err"); }
   }
 }
@@ -209,7 +229,7 @@ function renderTabs() {
     const close = document.createElement("span");
     close.className = "t-close";
     close.textContent = "✕";
-    close.addEventListener("click", (e) => { e.stopPropagation(); closeTab(t.key); });
+    close.addEventListener("click", (e) => { e.stopPropagation(); showCloseMenu(e, t.key); });
     el.append(dot, nm, close);
     el.addEventListener("click", () => activateTab(t.key));
     box.append(el);
@@ -217,12 +237,20 @@ function renderTabs() {
 }
 
 function openSession(sid) {
-  // 双击打开：每次都新建 tab（同一会话/IP 可开多个），不做去重
+  // 双击：有后台保活连接则恢复到它，否则新建独立连接
+  const s = sessionById(sid);
+  if (!s) return;
+  const bg = state.bg[sid] || [];
+  if (bg.length) openTab(sid, bg[0], "restore");
+  else openTab(sid, null, "new");
+}
+
+function openTab(sid, connId, mode) {
   const s = sessionById(sid);
   if (!s) return;
   state.tabKey += 1;
   const key = state.tabKey;
-  state.tabs.push({ key, sid, name: s.name });
+  state.tabs.push({ key, sid, name: s.name, connId, mode });
   activateTab(key);
 }
 
@@ -233,8 +261,7 @@ function activateTab(key) {
   renderTree();
   $("#empty-state").classList.add("hidden");
   $("#terminal-wrap").classList.remove("hidden");
-  const sid = activeSid();
-  if (sid) setupTerminal(sid);
+  setupTerminal(key);
 }
 
 function closeTab(key) {
@@ -265,7 +292,10 @@ function teardownTerminal() {
   $("#terminal").innerHTML = "";
 }
 
-function setupTerminal(id) {
+function setupTerminal(key) {
+  const tab = state.tabs.find((t) => t.key === key);
+  if (!tab) return;
+  const id = tab.sid;
   const term = new Terminal({
     cursorBlink: true,
     fontFamily: '"JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
@@ -303,12 +333,16 @@ function setupTerminal(id) {
   ro.observe($("#terminal-wrap"));
   term._ro = ro;
 
-  connectWs(id);
+  connectWs(key);
 }
 
-function connectWs(id) {
+function connectWs(key) {
+  const tab = state.tabs.find((t) => t.key === key);
+  if (!tab) return;
+  const id = tab.sid;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws/terminal/${id}`);
+  const path = tab.mode === "restore" ? `/ws/connection/${tab.connId}` : `/ws/terminal/${id}`;
+  const ws = new WebSocket(`${proto}://${location.host}${path}`);
   state.ws = ws;
   ws.onopen = () => {
     if (state.term && activeSid() === id) {
@@ -317,6 +351,7 @@ function connectWs(id) {
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
+    if (msg.type === "status" && msg.conn_id) tab.connId = msg.conn_id; // 记住 conn_id（断开/恢复用）
     if (!state.term || activeSid() !== id) return;
     if (msg.type === "output" || msg.type === "buffer") state.term.write(msg.data || "");
     else if (msg.type === "status") {
@@ -349,7 +384,10 @@ function showCtx(x, y, items) {
     const b = document.createElement("button");
     if (it.danger) b.className = "danger";
     b.textContent = it.label;
-    b.addEventListener("click", () => runCtxAction(it.action));
+    b.addEventListener("click", () => {
+      if (it.onSelect) it.onSelect();
+      else runCtxAction(it.action);
+    });
     ctxEl.append(b);
   });
   ctxEl.classList.remove("hidden");
@@ -360,12 +398,43 @@ function showCtx(x, y, items) {
 
 function hideCtx() { ctxEl.classList.add("hidden"); }
 
+// tab 关闭菜单：断开并关闭 / 仅关闭页面（SSH 后台保活）
+function showCloseMenu(e, key) {
+  showCtx(e.clientX, e.clientY, [
+    { label: "断开连接并关闭", onSelect: () => closeWithDisconnect(key) },
+    { label: "仅关闭页面（SSH 后台保活）", onSelect: () => { closeTab(key); refreshStatuses(); } },
+  ]);
+}
+
+async function closeWithDisconnect(key) {
+  const tab = state.tabs.find((t) => t.key === key);
+  if (tab && tab.connId) {
+    try { await api(`/api/connections/${tab.connId}/disconnect`, { method: "POST" }); } catch (_) {}
+  }
+  closeTab(key);
+  refreshStatuses();
+}
+
 async function runCtxAction(action) {
   const t = state.ctxTarget;
   state.ctxTarget = null;
   hideCtx();
   if (!t) return;
   if (action === "open" && t.type === "session") openSession(t.id);
+  else if (action === "restoreBg" && t.type === "session") {
+    const bg = state.bg[t.id] || [];
+    if (bg.length) openTab(t.id, bg[0], "restore");
+  }
+  else if (action === "openNew" && t.type === "session") openTab(t.id, null, "new");
+  else if (action === "disconnectBg" && t.type === "session") {
+    const bg = state.bg[t.id] || [];
+    for (const conn of bg) {
+      try { await api(`/api/connections/${conn}/disconnect`, { method: "POST" }); } catch (_) {}
+    }
+    state.bg[t.id] = [];
+    await loadAll();
+    refreshStatuses();
+  }
   else if (action === "renameGroup") promptModal("重命名分组", t.name, async (v) => {
     if (v) { await api(`/api/groups/${t.id}`, { method: "PATCH", body: { name: v } }); await loadAll(); }
   });
