@@ -244,7 +244,8 @@ body {
 .sftp-item.dir .sftp-icon { color: var(--warn); }
 .sftp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sftp-size { color: var(--text-faint); font-size: 10.5px; flex-shrink: 0; }
-.sftp-actions { padding: 8px 10px; border-top: 1px solid var(--border); }
+.sftp-actions { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); }
+.sftp-actions .sftp-hint { font-size: 11px; color: var(--text-faint); }
 .sftp-loading, .sftp-empty { padding: 16px; text-align: center; color: var(--text-faint); font-size: 12px; }
 .sftp-searchbar { display: flex; gap: 4px; padding: 0 10px 8px; }
 .sftp-searchbar input {
