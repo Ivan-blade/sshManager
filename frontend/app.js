@@ -1089,7 +1089,8 @@ function toggleQuickGroupMenu() {
 
 function runQuickCommand(cmd) {
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return toast("没有活动的终端连接");
-  state.ws.send(JSON.stringify({ type: "input", data: (cmd.command || "") + "\n" }));
+  // 只回显到终端：命令本身带换行符才执行；否则用户可编辑后回车
+  state.ws.send(JSON.stringify({ type: "input", data: (cmd.command || "") }));
 }
 
 let editingQuickCmdId = null;
@@ -1218,7 +1219,7 @@ document.addEventListener("click", (e) => {
   if (!e.target.closest("#quick-group-menu") && !e.target.closest("#quick-group-btn")) hideQuickMenu();
 });
 $("#qc-ok").addEventListener("click", submitQuickCmd);
-$("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter") submitQuickCmd(); });
+$("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitQuickCmd(); });
 $("#sftp-close").addEventListener("click", closeSftp);
 $("#sftp-up").addEventListener("click", () => { state.sftpPath = parentPath(state.sftpPath); loadSftp(); });
 $("#sftp-go").addEventListener("click", () => { state.sftpPath = $("#sftp-path").value || "."; loadSftp(); });
