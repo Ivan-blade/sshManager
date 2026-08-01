@@ -87,6 +87,7 @@ ssh root@192.168.8.101
 
 ## 文档
 
+- [使用指南](./docs/usage.md) —— 人怎么用 + AI 怎么调接口（含示例脚本）
 - [架构文档](./docs/architecture.md) —— 分层架构、关键设计决策、数据流、演进方向
 - [功能文档](./docs/features.md) —— 功能清单、使用方式、API 参考
 - [实现文档](./docs/implementation.md) —— 代码结构、模块实现细节、踩坑经验、待办
