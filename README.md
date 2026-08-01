@@ -46,7 +46,7 @@ cd frontend && npm install
 
 Closing a tab only detaches the page — the SSH connection keeps running in the background (output keeps accumulating). Reopen the app and bring the session back with one click:
 
-![Restoring a background SSH session](ssh_recover.gif)
+<video src="recover.mp4" controls muted loop style="max-width: 100%; border-radius: 8px;"></video>
 
 - Open **◔ Background** in the top bar — every background connection across all sessions is listed here, with its session name + host. Click a row to restore it into a tab.
 - **Sessions created by the AI work the same way**: when the AI opens a connection on a session it created (or any session), that connection shows up in the background list and can be restored just like a human-created one.
