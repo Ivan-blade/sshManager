@@ -105,8 +105,8 @@ body {
   display: flex; gap: 4px;
 }
 .topnav-item {
-  padding: 5px 14px;
-  border: none; border-radius: var(--radius-sm);
+  padding: 6px 28px;
+  border: none; border-radius: 2px;
   background: transparent; color: var(--text-dim);
   font-family: inherit; font-size: 13px; cursor: pointer;
   transition: all var(--transition);
@@ -171,22 +171,17 @@ body {
 }
 .panel-actions {
   display: flex; gap: 6px;
-  padding: 0 12px 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
 }
-.panel-actions .btn { flex: 1; padding: 6px 8px; }
+.panel-actions .btn { flex: 1; padding: 5px 4px; font-size: 12px; white-space: nowrap; }
 .panel-search {
   display: flex; gap: 6px; align-items: center;
   padding: 0 12px 10px;
 }
 .panel-search #filter { flex: 1; }
-.panel-bgrow { padding: 0 12px 8px; }
-.bg-toggle {
-  width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 5px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: transparent; color: var(--text-dim); font-size: 12px; cursor: pointer;
-  transition: all var(--transition);
-}
-.bg-toggle:hover { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-soft); }
+.bg-toggle { position: relative; }
+.bg-toggle:hover { border-color: var(--accent); color: var(--accent-strong); }
 #bg-count { color: var(--warn); font-weight: 600; }
 
 .bg-panel {
