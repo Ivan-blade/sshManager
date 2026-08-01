@@ -759,7 +759,7 @@ async function doExport(mode) {
   const data = await api("/api/export", { method: "POST", body });
   const json = JSON.stringify(data, null, 2);
   if (mode === "clipboard") {
-    try { await navigator.clipboard.writeText(json); toast("已复制到剪贴板"); }
+    try { await navigator.clipboard.writeText(json); }
     catch (_) { return toast("剪贴板不可用，请用「下载文件」"); }
   } else {
     const blob = new Blob([json], { type: "application/json" });
