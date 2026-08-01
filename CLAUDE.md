@@ -6,6 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **核心闭环已实现并可运行**（会话管理、终端流、AI 双路径、SFTP、Electron 壳、冒烟测试）。仍处早期：AI 模型接入、快捷命令、WebSocket 协作回显等尚未实现（见「未实现」）。
 
+## 开发进度快照（2026-08-01 手写记录，防上下文丢失）
+
+**已完成并验证**：后端全链路（会话 CRUD/过滤/导入导出、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find、SFTP local）、前端（xterm 本地化、会话列表 + AI 面板）、Electron 壳、pytest 冒烟测试 5/5 绿 + 浏览器 E2E 全过。
+**当前运行态**：后端跑在 **127.0.0.1:8747**（`backend/.venv/bin/python run.py` 后台启动，日志 `/tmp/sshmgr_server.log`）；数据已清理，仅 1 个「本地开发机」演示会话。
+**未验证**：SSH 传输路径（asyncssh 已按 API 编码，但测试环境 `192.168.8.101` 无免密凭据，未真机实测）。
+**下一步候选方向**（用户待定）：① 接入 AI 模型（把 LLM 意图解析/输出理解接到 exec/write/buffer 接口）② 快捷命令分组 + 增删查改 + 导入导出 ③ SSH 真机联调 ④ AI 后台 WebSocket 长连接回显浏览器的「一起干」模式。
+
+**本次开发踩坑（重要经验，勿重蹈）**：
+- **本地交互终端**：必须用 `pty.fork()` + `loop.add_reader` + 非阻塞 master（见 transports.py）。**绝不要**用读线程 + 阻塞 `os.read` —— 关 fd 无法唤醒读线程，进程陷入不可中断等待（SIGKILL 都杀不掉）。close 顺序：`remove_reader` → 关 fd → SIGHUP → 有界 WNOHANG 轮询 → SIGKILL 兜底。
+- **asyncssh 2.24 API**：resize 是 `change_terminal_size(width, height)`（非旧版 `resize_term`）；`create_process` 的 `term_size=(cols, rows)`；SFTP 用 `scandir()`（非 `listdir_attr`），条目是 `SFTPName.filename/.attrs`。
+- **同步路由不能 `asyncio.create_task`**（线程池里无事件循环 → "no running event loop"）：需要调 async 代码的路由必须 `async def` 并 await。
+- **Python 类体陷阱**：类方法叫 `list` 会遮蔽内置 `list`，导致后续方法注解 `-> list[dict]` 报错 → 方法改名。
+- **macOS `/tmp` 是符号链接**：`find /tmp` 默认不穿透（直接跑 shell 也一样），不是代码 bug，用 `/private/tmp` 或真实路径。
+- **uvicorn reload_dirs 必须限定 `["app"]`**，否则写 `data/sessions.json` 会触发服务重启。
+- **端口**：默认 8747，`SSHMANAGER_PORT` 环境变量覆盖；Electron 与后端读同一环境变量；前端 ws 用 `location.host` 自适应端口。
+
 ## 常用命令
 
 ```bash
