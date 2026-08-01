@@ -129,10 +129,14 @@ async def ai_find(sid: str, body: FindRequest, store: StoreDep) -> dict:
     except Exception as exc:
         raise HTTPException(502, f"connect failed: {exc}")
     try:
+        pattern = body.pattern
+        # 无通配符时做模糊子串匹配：123 → *123*（匹配 123.txt 等）
+        if not any(c in pattern for c in "*?["):
+            pattern = f"*{pattern}*"
         parts = ["find", shlex.quote(body.path)]
         if body.max_depth is not None:
             parts += ["-maxdepth", str(body.max_depth)]
-        parts += ["-name", shlex.quote(body.pattern)]
+        parts += ["-name", shlex.quote(pattern)]
         if body.ftype != "all":
             parts += ["-type", body.ftype]
         result = await transport.exec(" ".join(parts), timeout=60)
