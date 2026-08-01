@@ -192,10 +192,6 @@ function _sessionNode(s, style) {
   // hover 操作按钮：编辑 / 删除
   const act = document.createElement("span");
   act.className = "sess-actions";
-  const sftpBtn = document.createElement("button");
-  sftpBtn.className = "icon-btn small sftp-folder"; sftpBtn.title = "SFTP 文件";
-  sftpBtn.textContent = "📁";
-  sftpBtn.addEventListener("click", (e) => { e.stopPropagation(); openSftp(s.id); });
   const editBtn = document.createElement("button");
   editBtn.className = "icon-btn small"; editBtn.title = "编辑会话";
   editBtn.textContent = "✎";
@@ -211,7 +207,7 @@ function _sessionNode(s, style) {
     await loadAll();
     refreshStatuses();
   });
-  act.append(sftpBtn, editBtn, delBtn);
+  act.append(editBtn, delBtn);
 
   li.append(st, meta, act);
   return li;
@@ -1286,6 +1282,11 @@ document.addEventListener("click", (e) => {
 });
 $("#qc-ok").addEventListener("click", submitQuickCmd);
 $("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitQuickCmd(); });
+$("#tab-sftp").addEventListener("click", () => {
+  const sid = activeSid();
+  if (sid) openSftp(sid);
+  else toast("请先打开一个终端会话");
+});
 $("#sftp-close").addEventListener("click", closeSftp);
 $("#sftp-up").addEventListener("click", () => { state.sftpPath = parentPath(state.sftpPath); loadSftp(); });
 $("#sftp-go").addEventListener("click", () => { state.sftpPath = $("#sftp-path").value || "."; loadSftp(); });

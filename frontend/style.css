@@ -387,7 +387,7 @@ body {
 }
 .sess-item:hover .sess-actions { opacity: 1; }
 .icon-btn.small { width: 20px; height: 20px; font-size: 12px; }
-.sess-actions .sftp-folder { font-size: 13px; line-height: 1; }
+.tab-sftp { flex-shrink: 0; margin-left: 4px; font-size: 14px; }
 .sess-item.anim-in { animation: item-in 0.25s var(--transition) both; }
 @keyframes item-in { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
 
