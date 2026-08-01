@@ -142,6 +142,10 @@ function _sessionNode(s, style) {
   st.className = "sess-status off";
   st.dataset.status = s.id;
   st.innerHTML = '<span class="sdot"></span><span class="stext">离线</span>';
+  // 重建列表时从已知状态初始化，避免单击选中触发 renderTree 后闪成「离线」
+  const _bgN = (state.bg[s.id] || []).length;
+  if (_bgN > 0) { st.className = "sess-status bg"; st.querySelector(".stext").textContent = `后台 ×${_bgN}`; }
+  else if (state.statuses[s.id] === "on") { st.className = "sess-status on"; st.querySelector(".stext").textContent = "运行中"; }
   const meta = document.createElement("span");
   meta.className = "sess-meta";
   const name = document.createElement("div");
