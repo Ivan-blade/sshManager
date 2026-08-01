@@ -22,7 +22,6 @@
     </header>
     <!-- 全宽操作栏（横跨整个屏幕，不局限于左侧列表） -->
     <div class="actionbar">
-      <button id="btn-new" class="btn primary">＋ 新建</button>
       <button id="btn-import" class="btn ghost">导入</button>
       <button id="btn-export" class="btn ghost">导出</button>
       <button id="btn-bg" class="btn ghost bg-toggle" title="后台保活 SSH 连接">◔ 后台连接 <span id="bg-count">0</span></button>
@@ -32,7 +31,8 @@
       <aside id="panel">
         <div class="panel-search">
           <input id="filter" type="text" placeholder="搜索名称 / IP…">
-          <button id="btn-add-group" class="icon-btn" title="新建分组">＋</button>
+          <button id="btn-new" class="btn small" title="新建会话">＋会话</button>
+          <button id="btn-add-group" class="btn small" title="新建分组">＋分组</button>
         </div>
         <nav id="tree" class="tree"></nav>
       </aside>
