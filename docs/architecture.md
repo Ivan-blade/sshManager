@@ -43,13 +43,15 @@
 
 | 层 | 模块 | 职责 |
 |----|------|------|
-| 前端 | `frontend/app.js` | 会话列表渲染/过滤、终端连接（WebSocket）、AI 面板调用 |
-| 前端 | `frontend/index.html` / `style.css` | 单页布局、暗色主题、弹窗 |
+| 前端 | `frontend/app.js` | 分组树渲染/过滤、多标签终端、右键菜单、导入导出 |
+| 前端 | `frontend/index.html` / `style.css` | 单页布局、Warp 风暗色主题、弹窗 |
 | 前端 | `frontend/electron/main.js` | Electron 壳：拉起后端、等待就绪、加载页面、退出整树终止 |
 | 后端 | `app/routes/*.py` | HTTP/WS 路由，编排存储与运行时 |
+| 后端 | `app/routes/groups.py` | 会话分组 CRUD |
+| 后端 | `app/capabilities.py` | **AI 能力注册表**（名称/方法/路径/参数/示例） |
 | 后端 | `app/sessions.py` | 会话运行时：连接生命周期、输出缓冲、增量读取、写锁、扇出 |
 | 后端 | `app/transports.py` | 传输抽象：SSH / 本地，统一 exec 与交互通道接口 |
-| 后端 | `app/store.py` | 会话配置持久化（JSON 文件） |
+| 后端 | `app/store.py` | 会话与分组配置持久化（JSON 文件） |
 
 ## 4. 关键设计决策
 
@@ -78,7 +80,13 @@
 
 - 所有来源的输入（人的 WS input、AI 的 write 接口）通过**同一把 asyncio 锁**串行写入 pty，缓解人机并发导致的字节交错。
 
-### 4.5 传输层抽象
+### 4.5 AI 能力发现（自举）
+
+- `GET /api/ai/capabilities`：能力概述（轻量），`GET /api/ai/capabilities/{name}`：按名称查参数详情。
+- body 参数 schema 从 **Pydantic 模型** `model_json_schema()` 推导，保证与实际校验一致。
+- AI 不硬编码接口，先查清单再查参数再调用；AI 执行面无前端界面。
+
+### 4.6 传输层抽象
 
 - `Transport` 统一接口：`connect / close / exec / create_interactive`。
 - **SSH**（asyncssh）：exec 走 `conn.run`；交互走 `create_process`（pty 分配），连接复用（多路复用通道）。
@@ -123,6 +131,7 @@ POST/GET /sftp/* → SSH: 复用会话连接上的 SFTP 通道（asyncssh start_
 | `SSHMANAGER_PORT` | `8747` | 后端端口（避开常用端口），Electron 与后端读同一变量 |
 | `SSHMANAGER_RELOAD` | `1`（开发） | Electron 拉起时为 `0` 关闭热重载 |
 | `data/sessions.json` | — | 会话配置持久化（已 gitignore） |
+| `data/groups.json` | — | 分组配置持久化（已 gitignore） |
 | `TERMINAL_BUF_LIMIT` | 256KB | 会话输出缓冲上限 |
 
 ## 7. 演进方向（规划中）

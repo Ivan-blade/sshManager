@@ -82,9 +82,9 @@ def test_terminal_ws_and_ai_write(client, local_session):
     assert client.post(f"/api/sessions/{local_session}/connect").status_code == 200
 
     with client.websocket_connect(f"/ws/terminal/{local_session}") as ws:
-        # 初始：buffer 尾 + status
+        # 初始：读到 buffer 尾 + status 为止（shell 横幅等 output 消息可能穿插）
         seen = set()
-        for _ in range(2):
+        while not {"buffer", "status"} <= seen:
             seen.add(ws.receive_json()["type"])
         assert {"buffer", "status"} <= seen
 
@@ -113,6 +113,73 @@ def test_terminal_ws_and_ai_write(client, local_session):
     # 过期 since → gap
     b3 = client.get(f"/api/sessions/{local_session}/buffer", params={"since": 10**9}).json()
     assert b3["gap"] is True
+
+
+def test_session_id_unique_per_host(client):
+    """同一 host 建多个会话，id 必须互不相同（uuid4）。"""
+    host = "10.9.9.9"
+    ids = []
+    for i in range(5):
+        r = client.post("/api/sessions", json={"name": f"dup-{i}", "host": host, "username": "root"})
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["id"])
+    assert len(ids) == len(set(ids)), "会话 id 出现重复"
+    for sid in ids:
+        client.delete(f"/api/sessions/{sid}")
+
+
+def test_groups_crud_and_move(client):
+    """分组 CRUD + 会话移入/移出 + 删除分组回落根层级。失败也清理。"""
+    gid = sid = None
+    try:
+        g = client.post("/api/groups", json={"name": f"grp-{int(time.time()*1000)}"})
+        assert g.status_code == 200, g.text
+        gid = g.json()["id"]
+
+        s = client.post("/api/sessions", json={"name": "in-group", "host": "1.2.3.4", "group_id": gid})
+        assert s.status_code == 200, s.text
+        sid = s.json()["id"]
+        assert s.json()["group_id"] == gid
+
+        # 列表包含分组
+        assert any(x["id"] == gid for x in client.get("/api/groups").json())
+
+        # 移出分组（group_id 置空）
+        s2 = client.patch(f"/api/sessions/{sid}", json={"group_id": None})
+        assert s2.json().get("group_id") is None
+
+        # 移回分组
+        s3 = client.patch(f"/api/sessions/{sid}", json={"group_id": gid})
+        assert s3.json().get("group_id") == gid
+
+        # 重命名
+        assert client.patch(f"/api/groups/{gid}", json={"name": "renamed"}).json()["name"] == "renamed"
+
+        # 删除分组 → 组内会话回落根层级
+        assert client.delete(f"/api/groups/{gid}").json()["ok"] is True
+        gid = None
+        assert client.get(f"/api/sessions/{sid}").json().get("group_id") is None
+    finally:
+        if sid:
+            client.delete(f"/api/sessions/{sid}")
+        if gid:
+            client.delete(f"/api/groups/{gid}")
+
+
+def test_ai_capabilities(client):
+    """AI 能力发现：概述 + 详情 + 未知 404。"""
+    o = client.get("/api/ai/capabilities").json()
+    assert o["count"] >= 10
+    names = {c["name"] for c in o["capabilities"]}
+    assert {"list_sessions", "exec_command", "write_terminal", "find_files", "read_buffer"} <= names
+
+    d = client.get("/api/ai/capabilities/exec_command").json()
+    assert d["method"] == "POST"
+    body = next(p for p in d["params"] if p["in"] == "body")
+    assert "command" in body["schema"]["properties"]
+    assert "timeout" in body["schema"]["properties"]
+
+    assert client.get("/api/ai/capabilities/nope").status_code == 404
 
 
 def test_sftp_local(client, local_session):

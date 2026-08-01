@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 开发进度快照（2026-08-01 手写记录，防上下文丢失）
 
-**已完成并验证**：后端全链路（会话 CRUD/过滤/导入导出、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find、SFTP local）、前端（xterm 本地化、会话列表 + AI 面板）、Electron 壳、pytest 冒烟测试 5/5 绿 + 浏览器 E2E 全过。
+**已完成并验证**：后端全链路（会话/分组 CRUD、过滤、导入导出、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find、SFTP local、**AI 能力发现接口**）、前端（**Warp 风深色主题 + xshell 布局 + 分组树 + 多标签终端 + 右键菜单**，AI 面板已从界面移除）、Electron 壳、pytest 8/8 绿 + 浏览器 E2E 全过。
 **当前运行态**：后端跑在 **127.0.0.1:8747**（`backend/.venv/bin/python run.py` 后台启动，日志 `/tmp/sshmgr_server.log`）；数据已清理，仅 1 个「本地开发机」演示会话。
 **未验证**：SSH 传输路径（asyncssh 已按 API 编码，但测试环境 `192.168.8.101` 无免密凭据，未真机实测）。
-**下一步候选方向**（用户待定）：① 接入 AI 模型（把 LLM 意图解析/输出理解接到 exec/write/buffer 接口）② 快捷命令分组 + 增删查改 + 导入导出 ③ SSH 真机联调 ④ AI 后台 WebSocket 长连接回显浏览器的「一起干」模式。
+**下一步候选方向**（用户待定）：① 接入 AI 模型（能力发现接口 `/api/ai/capabilities*` 已就绪，把 LLM 接到 exec/write/buffer）② 快捷命令分组 + 增删查改 + 导入导出 ③ SSH 真机联调 ④ AI 后台 WebSocket 长连接回显浏览器的「一起干」模式 ⑤ SFTP 前端 UI。
 
 **本次开发踩坑（重要经验，勿重蹈）**：
 - **本地交互终端**：必须用 `pty.fork()` + `loop.add_reader` + 非阻塞 master（见 transports.py）。**绝不要**用读线程 + 阻塞 `os.read` —— 关 fd 无法唤醒读线程，进程陷入不可中断等待（SIGKILL 都杀不掉）。close 顺序：`remove_reader` → 关 fd → SIGHUP → 有界 WNOHANG 轮询 → SIGKILL 兜底。
@@ -21,6 +21,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **macOS `/tmp` 是符号链接**：`find /tmp` 默认不穿透（直接跑 shell 也一样），不是代码 bug，用 `/private/tmp` 或真实路径。
 - **uvicorn reload_dirs 必须限定 `["app"]`**，否则写 `data/sessions.json` 会触发服务重启。
 - **端口**：默认 8747，`SSHMANAGER_PORT` 环境变量覆盖；Electron 与后端读同一环境变量；前端 ws 用 `location.host` 自适应端口。
+- **PATCH 无法置空字段**：`model_dump(exclude_none=True)` 会把显式 `null` 也丢掉 → 会话无法移出分组。用 `model_fields_set` 判断「未传」vs「显式置空」，显式 null 单独放行。
+- **前端分组树结构**：折叠要生效，children 必须是与行头**兄弟**的 `div.group-children`（CSS 用 `>` 或兄弟选择器），别把 children 嵌进行头里否则点击行头会误触子项。
+- **`document.querySelector` 会命中 `display:none` 元素**：E2E 判断可见性要用 `offsetParent === null` 而不是元素是否存在。
 
 ## 常用命令
 

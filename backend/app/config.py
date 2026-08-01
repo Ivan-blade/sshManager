@@ -8,6 +8,7 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 # 数据目录（sessions.json 等），已 gitignore
 DATA_DIR = REPO_ROOT / "data"
 SESSIONS_FILE = DATA_DIR / "sessions.json"
+GROUPS_FILE = DATA_DIR / "groups.json"
 
 # 终端输出缓冲上限（字节）。AI 增量获取基于该缓冲，超出后最旧内容被丢弃。
 TERMINAL_BUF_LIMIT = 262144  # 256KB

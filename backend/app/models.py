@@ -14,6 +14,7 @@ class SessionCreate(BaseModel):
     password: Optional[str] = None
     key_path: Optional[str] = None
     description: Optional[str] = None
+    group_id: Optional[str] = None
 
 
 class SessionUpdate(BaseModel):
@@ -26,6 +27,15 @@ class SessionUpdate(BaseModel):
     password: Optional[str] = None
     key_path: Optional[str] = None
     description: Optional[str] = None
+    group_id: Optional[str] = None
+
+
+class GroupCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64)
+
+
+class GroupUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=64)
 
 
 class TerminalInput(BaseModel):

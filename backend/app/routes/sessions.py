@@ -54,7 +54,11 @@ def get_session(sid: str, store: StoreDep) -> dict:
 
 @router.patch("/{sid}")
 def update_session(sid: str, body: SessionUpdate, store: StoreDep) -> dict:
-    s = store.update(sid, body.model_dump(exclude_none=True))
+    patch = body.model_dump(exclude_none=True)
+    # 显式传 null 的 group_id 表示移出分组（区别于「未传该字段」）
+    if "group_id" in body.model_fields_set:
+        patch["group_id"] = body.group_id
+    s = store.update(sid, patch)
     if not s:
         raise HTTPException(404, "session not found")
     return _public(s)

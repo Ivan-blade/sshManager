@@ -10,54 +10,84 @@
 </head>
 <body>
   <div id="app">
-    <aside id="sidebar">
-      <div class="sidebar-header">
-        <h1>sshManager</h1>
-        <div class="toolbar">
-          <button id="btn-new" title="新建会话">＋ 新建</button>
-          <button id="btn-import" title="导入会话（JSON 文件 / 剪贴板）">导入</button>
-          <button id="btn-export" title="导出会话（JSON 文件 / 剪贴板）">导出</button>
-        </div>
-        <input id="filter" type="text" placeholder="按名称 / IP 同时过滤…">
+    <!-- 顶栏 -->
+    <header id="toolbar">
+      <div class="brand">
+        <span class="brand-mark">›</span>
+        <span class="brand-name">sshManager</span>
       </div>
-      <ul id="session-list"></ul>
-    </aside>
+      <div class="toolbar-actions">
+        <button id="btn-new" class="btn primary">＋ 新建会话</button>
+        <button id="btn-import" class="btn ghost">导入</button>
+        <button id="btn-export" class="btn ghost">导出</button>
+      </div>
+    </header>
 
-    <main id="main">
-      <div id="terminal-tabbar" class="hidden">
-        <span id="tab-name"></span>
-        <span id="tab-status" class="status"></span>
-        <span class="spacer"></span>
-        <button id="btn-disconnect" class="ghost">断开</button>
-      </div>
-      <div id="terminal-wrap" class="hidden">
-        <div id="terminal"></div>
-      </div>
-      <div id="empty-state">选择左侧会话打开终端</div>
-
-      <section id="ai-panel">
-        <div class="ai-header">AI 执行</div>
-        <div class="ai-row">
-          <select id="ai-mode">
-            <option value="write">写入终端（协作）</option>
-            <option value="exec">独立执行（非交互）</option>
-            <option value="find">递归搜索</option>
-          </select>
-          <input id="ai-path" class="ai-path hidden" placeholder="搜索路径（相对/绝对）" value=".">
-          <input id="ai-pattern" class="ai-pattern hidden" placeholder="名称模式，如 *.py" value="*">
-          <input id="ai-input" class="grow" placeholder="命令 / 要写入终端的内容…" autocomplete="off">
-          <button id="ai-run">执行</button>
+    <div id="body">
+      <!-- 左侧会话面板 -->
+      <aside id="panel">
+        <div class="panel-head">
+          <span class="panel-title">会话</span>
+          <button id="btn-add-group" class="icon-btn" title="新建分组">＋</button>
         </div>
-        <pre id="ai-output" class="hidden"></pre>
-      </section>
-    </main>
+        <div class="panel-search">
+          <input id="filter" type="text" placeholder="搜索名称 / IP…">
+        </div>
+        <nav id="tree" class="tree"></nav>
+      </aside>
+
+      <!-- 主区 -->
+      <main id="main">
+        <div id="tabbar">
+          <div id="tabs" class="tabs"></div>
+          <button id="btn-new-tab" class="icon-btn tab-new" title="新建会话">＋</button>
+        </div>
+        <div id="terminal-wrap" class="hidden">
+          <div id="terminal"></div>
+        </div>
+        <div id="empty-state">
+          <div class="empty-glyph">⎇</div>
+          <p>在左侧选择一个会话，打开终端</p>
+          <button id="empty-new" class="btn primary">＋ 新建会话</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 通用输入弹窗（新建分组 / 重命名） -->
+  <div id="modal-prompt" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="mp-title"></h3>
+      <input id="mp-input" autocomplete="off">
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>取消</button>
+        <button id="mp-ok" class="btn primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移动分组弹窗 -->
+  <div id="modal-move" class="modal hidden">
+    <div class="modal-box">
+      <h3>移动到分组</h3>
+      <select id="mm-select"></select>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>取消</button>
+        <button id="mm-ok" class="btn primary">移动</button>
+      </div>
+    </div>
   </div>
 
   <!-- 新建会话 -->
   <div id="modal-new" class="modal hidden">
     <div class="modal-box">
-      <h2>新建会话</h2>
-      <label>名称 <input id="n-name" required placeholder="例如：生产服务器"></label>
+      <h3>新建会话</h3>
+      <label>名称 <input id="n-name" required placeholder="例如：生产服务器" autocomplete="off"></label>
+      <label>分组
+        <select id="n-group">
+          <option value="">无分组</option>
+        </select>
+      </label>
       <label>传输
         <select id="n-transport">
           <option value="ssh">SSH（远程）</option>
@@ -65,22 +95,24 @@
         </select>
       </label>
       <div class="n-ssh">
-        <label>主机 <input id="n-host" value="localhost"></label>
-        <label>端口 <input id="n-port" type="number" value="22"></label>
-        <label>用户名 <input id="n-user" value="root"></label>
+        <div class="form-grid">
+          <label>主机 <input id="n-host" value="localhost" autocomplete="off"></label>
+          <label>端口 <input id="n-port" type="number" value="22"></label>
+        </div>
+        <label>用户名 <input id="n-user" value="root" autocomplete="off"></label>
         <label>认证
           <select id="n-auth">
             <option value="password">密码</option>
             <option value="key">SSH 密钥</option>
           </select>
         </label>
-        <label id="n-password-wrap">密码 <input id="n-password" type="password"></label>
-        <label id="n-key-wrap" class="hidden">密钥路径 <input id="n-key" placeholder="~/.ssh/id_rsa"></label>
+        <label id="n-password-wrap">密码 <input id="n-password" type="password" autocomplete="new-password"></label>
+        <label id="n-key-wrap" class="hidden">密钥路径 <input id="n-key" placeholder="~/.ssh/id_rsa" autocomplete="off"></label>
       </div>
-      <label>描述 <input id="n-desc"></label>
+      <label>描述 <input id="n-desc" autocomplete="off"></label>
       <div class="modal-actions">
-        <button class="ghost" data-close>取消</button>
-        <button id="n-submit" class="primary">创建</button>
+        <button class="btn ghost" data-close>取消</button>
+        <button id="n-submit" class="btn primary">创建</button>
       </div>
     </div>
   </div>
@@ -88,17 +120,20 @@
   <!-- 导入会话 -->
   <div id="modal-import" class="modal hidden">
     <div class="modal-box">
-      <h2>导入会话</h2>
+      <h3>导入会话</h3>
       <p class="hint">从剪贴板粘贴 JSON，或选择文件：</p>
       <textarea id="i-text" placeholder='[{"name":"host","transport":"ssh","host":"1.2.3.4","username":"root"}]'></textarea>
       <div class="modal-actions">
-        <button class="ghost" data-close>取消</button>
-        <button id="i-file" class="ghost">从文件导入</button>
-        <button id="i-submit" class="primary">从剪贴板导入</button>
+        <button class="btn ghost" data-close>取消</button>
+        <button id="i-file" class="btn ghost">从文件导入</button>
+        <button id="i-submit" class="btn primary">从剪贴板导入</button>
       </div>
       <input type="file" id="i-file-input" class="hidden" accept=".json,application/json">
     </div>
   </div>
+
+  <!-- 右键菜单 -->
+  <div id="ctxmenu" class="ctxmenu hidden"></div>
 
   <script src="vendor/xterm.js"></script>
   <script src="vendor/addon-fit.js"></script>

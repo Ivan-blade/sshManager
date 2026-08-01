@@ -15,13 +15,15 @@ sshManager/
 │   │   ├── config.py           # 路径/常量（缓冲上限、默认终端尺寸）
 │   │   ├── deps.py             # FastAPI 依赖注入（store/manager 单例）
 │   │   ├── models.py           # Pydantic 模型
-│   │   ├── store.py            # 会话配置 JSON 持久化
+│   │   ├── capabilities.py     # AI 能力注册表（概述 + 详情）
+│   │   ├── store.py            # 会话 + 分组 JSON 持久化
 │   │   ├── transports.py       # 传输抽象（SSH / Local）
 │   │   ├── sessions.py         # 会话运行时（缓冲/写锁/扇出）
 │   │   └── routes/
 │   │       ├── sessions.py     # 会话 CRUD/过滤/导入导出/连接控制
+│   │       ├── groups.py       # 分组 CRUD
 │   │       ├── terminal.py     # WS 终端流
-│   │       ├── ai.py           # AI 双路径（write/exec/find/buffer）
+│   │       ├── ai.py           # AI 双路径 + 能力发现 /api/ai
 │   │       └── sftp.py         # SFTP
 │   └── tests/test_smoke.py     # 冒烟测试
 ├── frontend/                   # 前端（FastAPI 静态托管）
@@ -75,8 +77,10 @@ class Transport:
 
 ### 2.3 存储（store.py）
 
-- `SessionStore`：`data/sessions.json` 列表格式，`threading.Lock` 保护，写时原子替换（tmp 文件 + replace）。
+- `SessionStore`：`data/sessions.json`（会话）+ `data/groups.json`（分组），均为列表格式，`threading.Lock` 保护，写时原子替换（tmp 文件 + replace）。
 - `list_all(query)`：多 token 过滤（每个 token 都是「名称+主机+端口」子串）。
+- 分组方法：`list_groups/create_group/rename_group/delete_group`；**`delete_group` 把组内会话 `group_id` 置空**（回落根层级）。
+- `update(sid, patch)`：patch 由路由层控制，已过滤 None；仅显式置空的字段（如 `group_id: null`）会带 None 值，用于「移出分组」。
 - 密码明文存储（与 xshell 同类工具一致），`_public()` 出参时剔除密码字段。
 
 ### 2.4 路由
@@ -86,11 +90,16 @@ class Transport:
 - 服务端 → 客户端：`{"type":"buffer","data"}`（历史尾）、`{"type":"output","data"}`、`{"type":"status","state"}`。
 - 连接失败（如 SSH 认证失败）→ 发 `status:error` 并 close(1011)。
 
-**ai.py — AI 双路径**：
+**groups.py — 分组 CRUD**：`GET/POST/PATCH/DELETE /api/groups`；删除分组回落组内会话。
+
+**ai.py — AI 双路径 + 能力发现**：
 - `POST /write`：向共享终端写入（协同路径），需已连接。
 - `GET /buffer?since=`：增量读取（AI 用）。
 - `POST /exec`：独立路径，`build_transport(cfg)` 新建连接执行（SSH 复用会话连接），返回 `{stdout, stderr, exit_code, duration_ms, timed_out}`。
 - `POST /find`：参数经 `shlex.quote` 安全引用后组 find 命令执行。
+- `GET /api/ai/capabilities` / `GET /api/ai/capabilities/{name}`：能力发现（见 `capabilities.py`）。
+
+**capabilities.py — 能力注册表**：每项 `name/method/path/summary/params/returns/example`；body 参数从 Pydantic 模型 `model_json_schema()` 推导（`_body_schema` 辅助函数）。`overview()` 返回轻量清单，`detail(name)` 返回完整参数。
 
 **sftp.py**：SSH 用 `conn.start_sftp_client()`（`scandir()` 列目录，条目为 `SFTPName.filename/.attrs`）；local 用 `os.scandir`/文件读写。
 
@@ -155,9 +164,9 @@ cd backend && .venv/bin/python -m pytest tests/ -v
 - `known_hosts=None` 不校验主机密钥（与 xshell 一致，安全权衡）。
 
 ### 待办
-- [ ] 接入 AI 模型（意图解析 → exec/write；输出理解 → 决策循环）
+- [ ] 接入 AI 模型（意图解析 → exec/write；输出理解 → 决策循环）——能力发现接口已就绪
 - [ ] AI 后台 WebSocket 长连接 + 回显浏览器的「一起干」模式
 - [ ] 快捷命令分组 + 增删查改 + 组间移动 + 导入导出
 - [ ] SFTP 前端 UI
-- [ ] 会话更新 UI（当前仅有创建/删除/过滤，PATCH API 已就绪）
+- [ ] 拖拽移动会话到分组（当前为右键菜单「移动到分组」）
 - [ ] 密码加密存储

@@ -78,7 +78,8 @@ ssh root@192.168.8.101
 
 ## 状态与已知事项
 
-- **已实现**：会话 CRUD/过滤/导入导出、终端 WebSocket 流（含增量 buffer）、AI 双路径（write 写入终端 / exec 独立执行 / find 递归搜索）、SFTP（复用连接）、Electron 壳、冒烟测试。
+- **已实现**：Warp 风 xshell 布局（左侧分组树 + 主区多标签终端 + 右键菜单）、会话/分组 CRUD/过滤/导入导出、终端 WebSocket 流（含增量 buffer）、AI 双路径（write / exec / find，**纯后端无界面**）、**AI 能力发现接口**（`/api/ai/capabilities*`）、SFTP（复用连接）、Electron 壳、冒烟测试。
+- **AI 接入**：AI 执行面无界面，AI agent 先 `GET /api/ai/capabilities` 自举了解能力，再 `GET /api/ai/capabilities/{name}` 查参数后调用。
 - **SSH 路径**：asyncssh 连接 + pty 交互已编码，但本仓库测试环境无凭据，需真实主机验证。
 - **密码存储**：会话密码明文存于 `data/sessions.json`（与 xshell 同类工具一致）；生产化应加密。
 

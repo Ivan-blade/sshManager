@@ -8,7 +8,7 @@ from .store import SessionStore
 
 @lru_cache
 def get_store() -> SessionStore:
-    return SessionStore(config.SESSIONS_FILE)
+    return SessionStore(config.SESSIONS_FILE, config.GROUPS_FILE)
 
 
 @lru_cache

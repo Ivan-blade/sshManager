@@ -1,4 +1,4 @@
-"""会话配置的持久化存储（data/sessions.json）。
+"""会话与分组的持久化存储（data/sessions.json、data/groups.json）。
 
 注意：密码以明文存于本地 JSON，与 xshell 同类工具一致。生产化应加密。
 """
@@ -11,11 +11,14 @@ from typing import Optional
 
 
 class SessionStore:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, groups_path: Optional[Path] = None):
         self.path = path
+        self.groups_path = groups_path or (path.parent / "groups.json")
         self._lock = threading.Lock()
         self._sessions: dict[str, dict] = {}
+        self._groups: dict[str, dict] = {}
         self._load()
+        self._load_groups()
 
     def _load(self) -> None:
         if self.path.exists():
@@ -26,11 +29,26 @@ class SessionStore:
             except (json.JSONDecodeError, OSError):
                 self._sessions = {}
 
+    def _load_groups(self) -> None:
+        if self.groups_path.exists():
+            try:
+                data = json.loads(self.groups_path.read_text("utf-8"))
+                if isinstance(data, list):
+                    self._groups = {g["id"]: g for g in data if isinstance(g, dict) and "id" in g}
+            except (json.JSONDecodeError, OSError):
+                self._groups = {}
+
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(list(self._sessions.values()), ensure_ascii=False, indent=2), "utf-8")
         tmp.replace(self.path)
+
+    def _save_groups(self) -> None:
+        self.groups_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.groups_path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(list(self._groups.values()), ensure_ascii=False, indent=2), "utf-8")
+        tmp.replace(self.groups_path)
 
     def list_all(self, query: str = "") -> list[dict]:
         """按 IP / 名称 同时过滤：query 的每个空白分隔 token 都必须是
@@ -61,12 +79,12 @@ class SessionStore:
         return rec
 
     def update(self, sid: str, patch: dict) -> Optional[dict]:
+        """patch 由路由层控制：已过滤 None，仅显式置空的字段（如 group_id）会带 None。"""
         with self._lock:
             rec = self._sessions.get(sid)
             if not rec:
                 return None
-            merged = {**rec, **{k: v for k, v in patch.items() if v is not None},
-                      "updated_at": int(time.time())}
+            merged = {**rec, **patch, "updated_at": int(time.time())}
             self._sessions[sid] = merged
             self._save()
             return merged
@@ -100,3 +118,48 @@ class SessionStore:
                 added += 1
             self._save()
         return {"added": added, "skipped": skipped, "total": len(self._sessions)}
+
+    # ---------------- 分组 ----------------
+    def list_groups(self) -> list[dict]:
+        with self._lock:
+            return sorted(self._groups.values(), key=lambda g: (g.get("name") or "").lower())
+
+    def get_group(self, gid: str) -> Optional[dict]:
+        with self._lock:
+            return self._groups.get(gid)
+
+    def create_group(self, name: str) -> dict:
+        now = int(time.time())
+        gid = uuid.uuid4().hex
+        rec = {"id": gid, "name": name, "created_at": now, "updated_at": now}
+        with self._lock:
+            self._groups[gid] = rec
+            self._save_groups()
+        return rec
+
+    def rename_group(self, gid: str, name: str) -> Optional[dict]:
+        with self._lock:
+            rec = self._groups.get(gid)
+            if not rec:
+                return None
+            rec["name"] = name
+            rec["updated_at"] = int(time.time())
+            self._save_groups()
+            return rec
+
+    def delete_group(self, gid: str) -> bool:
+        """删除分组；组内会话回到根层级（group_id 置空）。"""
+        with self._lock:
+            if gid not in self._groups:
+                return False
+            del self._groups[gid]
+            changed = False
+            for s in self._sessions.values():
+                if s.get("group_id") == gid:
+                    s["group_id"] = None
+                    s["updated_at"] = int(time.time())
+                    changed = True
+            self._save_groups()
+            if changed:
+                self._save()
+            return True

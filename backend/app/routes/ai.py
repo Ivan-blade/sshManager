@@ -10,6 +10,8 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..capabilities import detail as capability_detail
+from ..capabilities import overview as capabilities_overview
 from ..deps import get_manager, get_store
 from ..models import ExecRequest, FindRequest, TerminalInput
 from ..sessions import SessionManager
@@ -19,6 +21,24 @@ from ..transports import build_transport
 router = APIRouter(prefix="/api/sessions/{sid}", tags=["ai"])
 StoreDep = Annotated[SessionStore, Depends(get_store)]
 ManagerDep = Annotated[SessionManager, Depends(get_manager)]
+
+# AI 能力发现：让 AI agent 自举了解后端能做什么、怎么调
+capabilities_router = APIRouter(prefix="/api/ai", tags=["ai-capabilities"])
+
+
+@capabilities_router.get("/capabilities")
+def ai_capabilities_overview() -> dict:
+    """后端所有能力概述（名称/方法/路径/一句话说明）。"""
+    return capabilities_overview()
+
+
+@capabilities_router.get("/capabilities/{name}")
+def ai_capability_detail(name: str) -> dict:
+    """按能力名查询调用参数详情。"""
+    cap = capability_detail(name)
+    if not cap:
+        raise HTTPException(404, f"capability not found: {name}")
+    return cap
 
 
 def _require_session(store: SessionStore, sid: str):
