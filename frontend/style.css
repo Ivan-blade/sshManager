@@ -184,6 +184,17 @@ body {
   padding: 0 12px 10px;
 }
 .panel-search #filter { flex: 1; }
+.quick-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid transparent; border-radius: 3px;
+  background: transparent; color: var(--text-dim);
+  font-family: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+  transition: all var(--transition);
+}
+.quick-btn .plus { color: var(--accent); font-weight: 600; }
+.quick-btn:hover { background: var(--bg-hover); color: var(--text); }
+.quick-btn:hover .plus { color: var(--accent-strong); }
 .bg-toggle { position: relative; }
 .bg-toggle:hover { border-color: var(--accent); color: var(--accent-strong); }
 #bg-count { color: var(--warn); font-weight: 600; }
