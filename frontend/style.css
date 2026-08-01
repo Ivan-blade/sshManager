@@ -387,7 +387,9 @@ body {
 }
 .sess-item:hover .sess-actions { opacity: 1; }
 .icon-btn.small { width: 20px; height: 20px; font-size: 12px; }
-.tab-sftp { flex-shrink: 0; margin-left: 4px; font-size: 14px; }
+.tab-sftp { flex-shrink: 0; margin-left: 4px; }
+.tab-sftp svg { display: block; }
+.icon-edit { transform: scaleX(-1); } /* 修改图标朝左 */
 .sess-item.anim-in { animation: item-in 0.25s var(--transition) both; }
 @keyframes item-in { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
 

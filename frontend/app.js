@@ -193,7 +193,7 @@ function _sessionNode(s, style) {
   const act = document.createElement("span");
   act.className = "sess-actions";
   const editBtn = document.createElement("button");
-  editBtn.className = "icon-btn small"; editBtn.title = "编辑会话";
+  editBtn.className = "icon-btn small icon-edit"; editBtn.title = "编辑会话";
   editBtn.textContent = "✎";
   editBtn.addEventListener("click", (e) => { e.stopPropagation(); openEditModal(s.id); });
   const delBtn = document.createElement("button");
@@ -1099,7 +1099,7 @@ function renderQuickMenu() {
     row.addEventListener("click", () => { state.quickActiveGroup = gid; renderQuick(); hideQuickMenu(); });
     if (!isAll) {
       const rn = document.createElement("button");
-      rn.className = "icon-btn small"; rn.textContent = "✎"; rn.title = "重命名分组";
+      rn.className = "icon-btn small icon-edit"; rn.textContent = "✎"; rn.title = "重命名分组";
       rn.addEventListener("click", (e) => {
         e.stopPropagation();
         row.replaceWith(buildInlineGroupEdit(gid, label)); // 行内重命名，不弹窗
