@@ -8,9 +8,10 @@ const state = {
   filter: "",
   expanded: new Set(),
   statuses: {},      // sid -> "on" | "off" | "err"
-  tabs: [],          // [{id, name}]
+  tabs: [],          // [{key, sid, name}] —— key 唯一，同一会话可开多个 tab
+  tabKey: 0,         // tab 唯一 key 递增器
   selectedId: null,  // 列表选中（单击）
-  activeId: null,
+  activeKey: null,   // 当前激活 tab 的 key
   term: null,
   fit: null,
   ws: null,
@@ -44,6 +45,11 @@ async function loadAll() {
 
 function sessionById(id) {
   return state.sessions.find((s) => s.id === id);
+}
+
+function activeSid() {
+  const t = state.tabs.find((x) => x.key === state.activeKey);
+  return t ? t.sid : null;
 }
 
 function _matches(s) {
@@ -128,7 +134,7 @@ function _groupNode(g, items, style) {
 function _sessionNode(s, style) {
   const li = document.createElement("li");
   li.className = "tree-item sess-item"
-    + (s.id === state.activeId ? " active" : s.id === state.selectedId ? " selected" : "");
+    + (s.id === activeSid() ? " active" : s.id === state.selectedId ? " selected" : "");
   li.style.cssText = style;
   li.dataset.sid = s.id;
   const dot = document.createElement("span");
@@ -191,54 +197,55 @@ function renderTabs() {
   box.innerHTML = "";
   for (const t of state.tabs) {
     const el = document.createElement("div");
-    el.className = "tab" + (t.id === state.activeId ? " active" : "");
+    el.className = "tab" + (t.key === state.activeKey ? " active" : "");
     const dot = document.createElement("span");
     dot.className = "dot";
-    dot.dataset.tdot = t.id;
+    dot.dataset.tdot = t.sid;
     dot.style.cssText = "width:6px;height:6px;border-radius:50%;flex-shrink:0;background:" +
-      (state.statuses[t.id] === "on" ? "var(--ok)" : state.statuses[t.id] === "err" ? "var(--danger)" : "var(--text-faint)");
+      (state.statuses[t.sid] === "on" ? "var(--ok)" : state.statuses[t.sid] === "err" ? "var(--danger)" : "var(--text-faint)");
     const nm = document.createElement("span");
     nm.className = "tname";
     nm.textContent = t.name;
     const close = document.createElement("span");
     close.className = "t-close";
     close.textContent = "✕";
-    close.addEventListener("click", (e) => { e.stopPropagation(); closeTab(t.id); });
+    close.addEventListener("click", (e) => { e.stopPropagation(); closeTab(t.key); });
     el.append(dot, nm, close);
-    el.addEventListener("click", () => activateTab(t.id));
+    el.addEventListener("click", () => activateTab(t.key));
     box.append(el);
   }
 }
 
-function openSession(id) {
-  const s = sessionById(id);
+function openSession(sid) {
+  // 双击打开：每次都新建 tab（同一会话/IP 可开多个），不做去重
+  const s = sessionById(sid);
   if (!s) return;
-  if (state.activeId === id && state.tabs.some((t) => t.id === id)) return; // 已是当前标签，避免重建闪断
-  if (!state.tabs.some((t) => t.id === id)) {
-    state.tabs.push({ id, name: s.name });
-  }
-  activateTab(id);
+  state.tabKey += 1;
+  const key = state.tabKey;
+  state.tabs.push({ key, sid, name: s.name });
+  activateTab(key);
 }
 
-function activateTab(id) {
+function activateTab(key) {
   teardownTerminal();
-  state.activeId = id;
+  state.activeKey = key;
   renderTabs();
   renderTree();
   $("#empty-state").classList.add("hidden");
   $("#terminal-wrap").classList.remove("hidden");
-  setupTerminal(id);
+  const sid = activeSid();
+  if (sid) setupTerminal(sid);
 }
 
-function closeTab(id) {
-  const idx = state.tabs.findIndex((t) => t.id === id);
+function closeTab(key) {
+  const idx = state.tabs.findIndex((t) => t.key === key);
   if (idx < 0) return;
   state.tabs.splice(idx, 1);
-  if (state.activeId === id) {
+  if (state.activeKey === key) {
     teardownTerminal();
-    state.activeId = null;
+    state.activeKey = null;
     if (state.tabs.length) {
-      activateTab(state.tabs[Math.min(idx, state.tabs.length - 1)].id);
+      activateTab(state.tabs[Math.min(idx, state.tabs.length - 1)].key);
       return;
     }
     $("#terminal-wrap").classList.add("hidden");
@@ -304,13 +311,13 @@ function connectWs(id) {
   const ws = new WebSocket(`${proto}://${location.host}/ws/terminal/${id}`);
   state.ws = ws;
   ws.onopen = () => {
-    if (state.term && state.activeId === id) {
+    if (state.term && activeSid() === id) {
       ws.send(JSON.stringify({ type: "resize", cols: state.term.cols, rows: state.term.rows }));
     }
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (!state.term || state.activeId !== id) return;
+    if (!state.term || activeSid() !== id) return;
     if (msg.type === "output" || msg.type === "buffer") state.term.write(msg.data || "");
     else if (msg.type === "status") {
       const on = msg.state === "connected";
@@ -319,10 +326,10 @@ function connectWs(id) {
     }
   };
   ws.onclose = () => {
-    if (state.activeId === id) { setDot(id, "off"); renderTabs(); }
+    if (activeSid() === id) { setDot(id, "off"); renderTabs(); }
     refreshStatuses();
   };
-  ws.onerror = () => { if (state.activeId === id) setDot(id, "err"); };
+  ws.onerror = () => { if (activeSid() === id) setDot(id, "err"); };
 }
 
 // ==========================================================================
@@ -365,8 +372,7 @@ async function runCtxAction(action) {
   else if (action === "renameSession") promptModal("重命名会话", t.name, async (v) => {
     if (v) {
       await api(`/api/sessions/${t.id}`, { method: "PATCH", body: { name: v } });
-      const tab = state.tabs.find((x) => x.id === t.id);
-      if (tab) tab.name = v;
+      state.tabs.forEach((tb) => { if (tb.sid === t.id) tb.name = v; });
       await loadAll(); renderTabs();
     }
   });
