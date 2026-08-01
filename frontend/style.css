@@ -580,6 +580,8 @@ body {
 .ctxmenu button:hover { background: var(--bg-hover); color: var(--accent-strong); }
 .ctxmenu button.danger:hover { background: rgba(248, 113, 113, 0.12); color: var(--danger); }
 .ctxmenu .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.ctxmenu .ctx-caret { margin-left: auto; font-size: 10px; color: var(--text-faint); }
+.ctxmenu.ctx-sub { position: fixed; z-index: 201; min-width: 150px; }
 
 /* 状态标签（终端标签栏用） */
 .status.on { color: var(--ok); }

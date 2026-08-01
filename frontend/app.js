@@ -448,31 +448,78 @@ function connectWs(key) {
 // ==========================================================================
 const ctxEl = $("#ctxmenu");
 
-function showCtx(x, y, items) {
-  ctxEl.innerHTML = "";
-  items.forEach((it, idx) => {
-    if (it === "sep") {
-      const sep = document.createElement("div");
-      sep.className = "ctx-sep";
-      ctxEl.append(sep);
-      return;
-    }
-    const b = document.createElement("button");
-    if (it.danger) b.className = "danger";
+let subMenus = [];
+
+function removeSubMenus() {
+  for (const s of subMenus) s.remove();
+  subMenus = [];
+}
+
+function buildCtxItem(container, it) {
+  if (it === "sep") {
+    const sep = document.createElement("div");
+    sep.className = "ctx-sep";
+    container.append(sep);
+    return;
+  }
+  const b = document.createElement("button");
+  if (it.danger) b.className = "danger";
+
+  if (it.submenu) {
+    // 二级子菜单：hover 显示右侧飞出
+    const txt = document.createElement("span");
+    txt.textContent = it.label;
+    const caret = document.createElement("span");
+    caret.className = "ctx-caret"; caret.textContent = "▸";
+    b.append(txt, caret);
+    const sub = document.createElement("div");
+    sub.className = "ctxmenu ctx-sub";
+    sub.style.display = "none";
+    for (const si of it.submenu) buildCtxItem(sub, si);
+    document.body.append(sub);
+    subMenus.push(sub);
+
+    const show = () => {
+      sub.style.display = "block";
+      const br = b.getBoundingClientRect();
+      const sw = sub.offsetWidth || 170;
+      const left = (br.right + 4 + sw > window.innerWidth) ? br.left - sw - 4 : br.right + 4;
+      sub.style.left = left + "px";
+      sub.style.top = br.top + "px";
+    };
+    const maybeHide = () => {
+      setTimeout(() => {
+        if (!sub.matches(":hover") && !b.matches(":hover")) sub.style.display = "none";
+      }, 120);
+    };
+    b.addEventListener("mouseenter", show);
+    b.addEventListener("mouseleave", maybeHide);
+    sub.addEventListener("mouseleave", maybeHide);
+  } else {
     b.textContent = it.label;
     b.addEventListener("click", () => {
+      hideCtx();
       if (it.onSelect) it.onSelect();
       else runCtxAction(it.action);
     });
-    ctxEl.append(b);
-  });
+  }
+  container.append(b);
+}
+
+function showCtx(x, y, items) {
+  removeSubMenus();
+  ctxEl.innerHTML = "";
+  for (const it of items) buildCtxItem(ctxEl, it);
   ctxEl.classList.remove("hidden");
   const rect = ctxEl.getBoundingClientRect();
   ctxEl.style.left = Math.min(x, window.innerWidth - rect.width - 8) + "px";
   ctxEl.style.top = Math.min(y, window.innerHeight - rect.height - 8) + "px";
 }
 
-function hideCtx() { ctxEl.classList.add("hidden"); }
+function hideCtx() {
+  ctxEl.classList.add("hidden");
+  removeSubMenus();
+}
 
 async function closeWithDisconnect(key) {
   const tab = state.tabs.find((t) => t.key === key);
@@ -971,6 +1018,10 @@ function renderQuick() {
         e.preventDefault(); e.stopPropagation();
         showCtx(e.clientX, e.clientY, [
           { label: "编辑", action: "quickEditCmd" },
+          { label: "切换分组", submenu: [
+            { label: "默认分组", onSelect: () => moveQuickCmd(c.id, null) },
+            ...state.quickGroups.map((g) => ({ label: g.name, onSelect: () => moveQuickCmd(c.id, g.id) })),
+          ]},
           { label: "删除", action: "quickDeleteCmd", danger: true },
         ]);
         state.ctxTarget = { type: "quickCmd", id: c.id, name: c.name };
@@ -1098,6 +1149,11 @@ function runQuickCommand(cmd) {
   state.ws.send(JSON.stringify({ type: "input", data: (cmd.command || "") }));
   // 焦点还给终端：否则回车会再次触发快捷命令按钮（重复输入）
   if (state.term) state.term.focus();
+}
+
+async function moveQuickCmd(cid, newGroupId) {
+  await api(`/api/quick/commands/${cid}`, { method: "PATCH", body: { group_id: newGroupId } });
+  await loadQuick();
 }
 
 let editingQuickCmdId = null;
