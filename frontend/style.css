@@ -273,8 +273,7 @@ body {
   white-space: nowrap; transition: all var(--transition);
 }
 .quick-cmd:hover { border-color: var(--accent); color: var(--accent-strong); }
-.quick-add-cmd { flex-shrink: 0; }
-.quick-empty { color: var(--text-faint); font-size: 12px; }
+.quick-right .quick-add-cmd { flex-shrink: 0; }
 
 /* 分组上拉菜单 */
 .quick-group-menu {
@@ -294,6 +293,13 @@ body {
 .qgm-item.active { color: var(--accent-strong); background: var(--accent-soft); }
 .qgm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qgm-item .icon-btn { width: 18px; height: 18px; font-size: 11px; }
+.qgm-item.qgm-input { padding: 4px 8px; cursor: default; }
+.qgm-input input {
+  flex: 1; min-width: 0;
+  padding: 4px 6px; border: 1px solid var(--border); border-radius: 3px;
+  background: var(--bg); color: var(--text); font-size: 12px; font-family: inherit; outline: none;
+}
+.qgm-input input:focus { border-color: var(--accent); }
 .qgm-new {
   width: 100%; padding: 8px; border: none; border-top: 1px solid var(--border);
   background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; font-family: inherit;

@@ -970,9 +970,56 @@ function renderQuick() {
 
 function hideQuickMenu() { $("#quick-group-menu").classList.add("hidden"); }
 
-function toggleQuickGroupMenu() {
+function buildInlineGroupInput() {
+  const row = document.createElement("div");
+  row.className = "qgm-item qgm-input";
+  const input = document.createElement("input");
+  input.placeholder = "分组名称";
+  const ok = document.createElement("button");
+  ok.className = "icon-btn small"; ok.textContent = "✓"; ok.title = "确定";
+  const commit = async () => {
+    const v = input.value.trim();
+    if (!v) return;
+    await api("/api/quick/groups", { method: "POST", body: { name: v } });
+    await loadQuick();
+    renderQuickMenu();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") commit();
+    else if (e.key === "Escape") renderQuickMenu();
+  });
+  ok.addEventListener("click", commit);
+  row.append(input, ok);
+  setTimeout(() => input.focus(), 0);
+  return row;
+}
+
+function buildInlineGroupEdit(gid, currentName) {
+  const row = document.createElement("div");
+  row.className = "qgm-item qgm-input";
+  const input = document.createElement("input");
+  input.value = currentName;
+  const ok = document.createElement("button");
+  ok.className = "icon-btn small"; ok.textContent = "✓"; ok.title = "确定";
+  const commit = async () => {
+    const v = input.value.trim();
+    if (!v) return;
+    await api(`/api/quick/groups/${gid}`, { method: "PATCH", body: { name: v } });
+    await loadQuick();
+    renderQuickMenu();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") commit();
+    else if (e.key === "Escape") renderQuickMenu();
+  });
+  ok.addEventListener("click", commit);
+  row.append(input, ok);
+  setTimeout(() => input.focus(), 0);
+  return row;
+}
+
+function renderQuickMenu() {
   const menu = $("#quick-group-menu");
-  if (!menu.classList.contains("hidden")) { hideQuickMenu(); return; }
   menu.innerHTML = "";
   const head = document.createElement("div");
   head.className = "qgm-head"; head.textContent = "分组";
@@ -990,10 +1037,7 @@ function toggleQuickGroupMenu() {
       rn.className = "icon-btn small"; rn.textContent = "✎"; rn.title = "重命名分组";
       rn.addEventListener("click", (e) => {
         e.stopPropagation();
-        hideQuickMenu();
-        promptModal("重命名分组", label, async (v) => {
-          if (v) { await api(`/api/quick/groups/${gid}`, { method: "PATCH", body: { name: v } }); await loadQuick(); }
-        });
+        row.replaceWith(buildInlineGroupEdit(gid, label)); // 行内重命名，不弹窗
       });
       const del = document.createElement("button");
       del.className = "icon-btn small danger"; del.textContent = "✕"; del.title = "删除分组";
@@ -1002,7 +1046,7 @@ function toggleQuickGroupMenu() {
         await api(`/api/quick/groups/${gid}`, { method: "DELETE" });
         if (state.quickActiveGroup === gid) state.quickActiveGroup = null;
         await loadQuick();
-        hideQuickMenu();
+        renderQuickMenu();
       });
       row.append(rn, del);
     }
@@ -1014,14 +1058,14 @@ function toggleQuickGroupMenu() {
 
   const foot = document.createElement("button");
   foot.className = "qgm-new"; foot.textContent = "＋ 新建分组";
-  foot.addEventListener("click", () => {
-    hideQuickMenu();
-    promptModal("新建分组", "", async (v) => {
-      if (v) { await api("/api/quick/groups", { method: "POST", body: { name: v } }); await loadQuick(); }
-    });
-  });
+  foot.addEventListener("click", () => foot.replaceWith(buildInlineGroupInput())); // 行内新增，不弹窗
   menu.append(foot);
+}
 
+function toggleQuickGroupMenu() {
+  const menu = $("#quick-group-menu");
+  if (!menu.classList.contains("hidden")) { hideQuickMenu(); return; }
+  renderQuickMenu();
   const qb = $("#quickbar").getBoundingClientRect();
   menu.style.left = qb.left + "px";
   menu.style.bottom = (window.innerHeight - qb.top + 4) + "px";
