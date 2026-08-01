@@ -731,11 +731,16 @@ function renderExportList(sel, items, type) {
     cb.type = "checkbox";
     cb.value = it.id;
     cb.checked = true;
-    const txt = document.createElement("span");
-    txt.textContent = type === "group_ids"
-      ? it.name
-      : `${it.name} · ${it.host || it.transport}`;
-    label.append(cb, txt);
+    label.append(cb);
+    const nm = document.createElement("span");
+    nm.textContent = it.name;
+    label.append(nm);
+    if (type === "session_ids") {
+      const hs = document.createElement("span");
+      hs.className = "exp-host";
+      hs.textContent = it.host || it.transport;
+      label.append(hs);
+    }
     box.append(label);
   }
 }
