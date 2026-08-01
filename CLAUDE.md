@@ -9,8 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 常用命令
 
 ```bash
-# 后端（浏览器开发模式）
-cd backend && .venv/bin/python run.py            # http://127.0.0.1:8000
+# 后端（浏览器开发模式，端口默认 8747，可用 SSHMANAGER_PORT 覆盖）
+cd backend && .venv/bin/python run.py            # http://127.0.0.1:8747
 
 # 桌面壳（自动拉起 Python 后端）
 cd frontend && npm start

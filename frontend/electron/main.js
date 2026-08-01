@@ -3,7 +3,8 @@ const { app, BrowserWindow } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 
-const BACKEND_URL = 'http://127.0.0.1:8000';
+const PORT = process.env.SSHMANAGER_PORT || '8747';
+const BACKEND_URL = `http://127.0.0.1:${PORT}`;
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const PYTHON = process.env.SSHMANAGER_PYTHON
   || path.join(REPO_ROOT, 'backend', '.venv', 'bin', 'python');

@@ -48,8 +48,10 @@ cd frontend && npm start
 
 ```bash
 cd backend && .venv/bin/python run.py
-# 打开 http://127.0.0.1:8000
+# 打开 http://127.0.0.1:8747
 ```
+
+> 端口默认 **8747**（避开常用端口），可用环境变量覆盖：`SSHMANAGER_PORT=9000 .venv/bin/python run.py`
 
 首次运行需安装依赖：
 
