@@ -1097,7 +1097,7 @@ function openQuickCmdModal(cmd) {
   editingQuickCmdId = cmd ? cmd.id : null;
   $("#qc-title").textContent = cmd ? "编辑命令" : "新建命令";
   const sel = $("#qc-group");
-  sel.innerHTML = '<option value="">未分组</option>';
+  sel.innerHTML = '<option value="">默认分组</option>';
   for (const g of state.quickGroups) {
     const o = document.createElement("option");
     o.value = g.id; o.textContent = g.name;
