@@ -8,7 +8,7 @@
 
 </div>
 
-An "enhanced xshell": human and AI work on the **same terminal session** from a browser or a desktop app. The AI can silently operate a connection in the background (run commands, search files, manage SFTP), or inject commands into a shared terminal that the human sees live.
+A **human-machine collaborative SSH session manager**: human and AI work on the **same terminal session** from a browser or a desktop app. The AI can silently operate a connection in the background (run commands, search files, manage SFTP), or inject commands into a shared terminal that the human sees live.
 
 ## Features
 
@@ -70,7 +70,6 @@ See [docs/architecture.md](docs/architecture.md) for the full picture.
 
 ## Roadmap
 
-- [ ] Wire an LLM to the capability API (intent → commands, output → next step)
 - [ ] AI background WebSocket echo → "work together" mode
 - [ ] Drag-and-drop sorting for sessions / groups / commands
 - [ ] Encrypted credential storage
