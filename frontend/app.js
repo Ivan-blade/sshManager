@@ -772,17 +772,17 @@ async function doExport(mode) {
   closeModal($("#modal-export"));
 }
 
-// 导入：支持 {groups, sessions} 或旧的会话数组
-async function importFromText(text) {
+// 导入：直接从剪贴板读取，只支持 {groups, sessions}
+async function importFromClipboard() {
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch (_) { return toast("无法读取剪贴板（浏览器权限限制）"); }
+  if (!text || !text.trim()) return toast("剪贴板为空");
   let data;
   try { data = JSON.parse(text); } catch (_) { return toast("JSON 解析失败"); }
-  let payload;
-  if (Array.isArray(data)) payload = { sessions: data };
-  else if (data && Array.isArray(data.sessions)) payload = { groups: data.groups || [], sessions: data.sessions };
-  else return toast("格式不正确：应为会话数组或 {groups, sessions}");
-  const res = await api("/api/import", { method: "POST", body: payload });
-  toast(`导入完成：分组 ${res.groups_added}，会话新增 ${res.added}，跳过 ${res.skipped}`);
-  closeModal($("#modal-import"));
+  if (!data || !Array.isArray(data.sessions)) return toast("格式不正确：应为 {groups, sessions}");
+  const res = await api("/api/import", { method: "POST", body: { groups: data.groups || [], sessions: data.sessions } });
+  toast(`导入完成：会话 +${res.added}（跳过 ${res.skipped}），分组 +${res.groups_added}`);
   await loadAll();
 }
 
@@ -876,15 +876,7 @@ $("#exp-clipboard").addEventListener("click", () => doExport("clipboard"));
 $("#exp-file").addEventListener("click", () => doExport("file"));
 $("#exp-groups-all").addEventListener("click", () => toggleAllExport("#exp-groups"));
 $("#exp-sessions-all").addEventListener("click", () => toggleAllExport("#exp-sessions"));
-$("#btn-import").addEventListener("click", () => { openModal($("#modal-import")); $("#i-text").focus(); });
-$("#i-submit").addEventListener("click", () => importFromText($("#i-text").value));
-$("#i-file").addEventListener("click", () => $("#i-file-input").click());
-$("#i-file-input").addEventListener("change", async (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  await importFromText(await f.text());
-  e.target.value = "";
-});
+$("#btn-import").addEventListener("click", importFromClipboard);
 
 // 启动
 loadAll();
