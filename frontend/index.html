@@ -137,6 +137,19 @@
     </div>
   </div>
 
+  <!-- 导入 -->
+  <div id="modal-import" class="modal hidden">
+    <div class="modal-box">
+      <h3>导入</h3>
+      <p class="hint">支持 <code>{groups, sessions}</code> 格式。</p>
+      <div class="import-actions">
+        <button id="i-clipboard" class="btn primary">从剪贴板导入</button>
+        <button id="i-file" class="btn ghost">从文件导入</button>
+      </div>
+      <input type="file" id="i-file-input" class="hidden" accept=".json,application/json">
+    </div>
+  </div>
+
   <!-- 右键菜单 -->
   <div id="ctxmenu" class="ctxmenu hidden"></div>
 

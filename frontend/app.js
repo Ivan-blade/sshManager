@@ -772,17 +772,28 @@ async function doExport(mode) {
   closeModal($("#modal-export"));
 }
 
-// 导入：直接从剪贴板读取，只支持 {groups, sessions}
+// 导入：从剪贴板或文件，只支持 {groups, sessions}
+function openImportModal() { openModal($("#modal-import")); }
+
 async function importFromClipboard() {
   let text;
   try { text = await navigator.clipboard.readText(); }
   catch (_) { return toast("无法读取剪贴板（浏览器权限限制）"); }
-  if (!text || !text.trim()) return toast("剪贴板为空");
+  await doImportText(text);
+}
+
+async function importFromFile(file) {
+  await doImportText(await file.text());
+}
+
+async function doImportText(text) {
+  if (!text || !text.trim()) return toast("内容为空");
   let data;
   try { data = JSON.parse(text); } catch (_) { return toast("JSON 解析失败"); }
   if (!data || !Array.isArray(data.sessions)) return toast("格式不正确：应为 {groups, sessions}");
   const res = await api("/api/import", { method: "POST", body: { groups: data.groups || [], sessions: data.sessions } });
   toast(`导入完成：会话 +${res.added}（跳过 ${res.skipped}），分组 +${res.groups_added}`);
+  closeModal($("#modal-import"));
   await loadAll();
 }
 
@@ -876,7 +887,14 @@ $("#exp-clipboard").addEventListener("click", () => doExport("clipboard"));
 $("#exp-file").addEventListener("click", () => doExport("file"));
 $("#exp-groups-all").addEventListener("click", () => toggleAllExport("#exp-groups"));
 $("#exp-sessions-all").addEventListener("click", () => toggleAllExport("#exp-sessions"));
-$("#btn-import").addEventListener("click", importFromClipboard);
+$("#btn-import").addEventListener("click", openImportModal);
+$("#i-clipboard").addEventListener("click", importFromClipboard);
+$("#i-file").addEventListener("click", () => $("#i-file-input").click());
+$("#i-file-input").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (f) await importFromFile(f);
+  e.target.value = "";
+});
 
 // 启动
 loadAll();
