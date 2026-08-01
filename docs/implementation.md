@@ -1,0 +1,163 @@
+# 实现文档
+
+> 适用版本：核心闭环已实现（2026-08-01）。
+
+## 1. 目录结构
+
+```
+sshManager/
+├── backend/                    # Python FastAPI 后端
+│   ├── run.py                  # 启动器（端口 8747，SSHMANAGER_PORT 可覆盖）
+│   ├── requirements.txt
+│   ├── pytest.ini
+│   ├── app/
+│   │   ├── main.py             # 应用组装：路由注册 + 静态托管 + lifespan 关闭
+│   │   ├── config.py           # 路径/常量（缓冲上限、默认终端尺寸）
+│   │   ├── deps.py             # FastAPI 依赖注入（store/manager 单例）
+│   │   ├── models.py           # Pydantic 模型
+│   │   ├── store.py            # 会话配置 JSON 持久化
+│   │   ├── transports.py       # 传输抽象（SSH / Local）
+│   │   ├── sessions.py         # 会话运行时（缓冲/写锁/扇出）
+│   │   └── routes/
+│   │       ├── sessions.py     # 会话 CRUD/过滤/导入导出/连接控制
+│   │       ├── terminal.py     # WS 终端流
+│   │       ├── ai.py           # AI 双路径（write/exec/find/buffer）
+│   │       └── sftp.py         # SFTP
+│   └── tests/test_smoke.py     # 冒烟测试
+├── frontend/                   # 前端（FastAPI 静态托管）
+│   ├── index.html              # 单页布局 + 弹窗
+│   ├── style.css               # 暗色主题
+│   ├── app.js                  # 全部前端逻辑
+│   ├── vendor/                 # xterm.js + addon-fit 本地化（离线可用）
+│   ├── electron/main.js        # Electron 壳
+│   └── package.json
+├── data/sessions.json          # 运行数据（gitignored）
+└── docs/                       # 本文档目录
+```
+
+## 2. 后端实现
+
+### 2.1 传输层（transports.py）
+
+统一接口（ABC）：
+
+```python
+class Transport:
+    async def connect() -> None
+    async def close() -> None
+    async def exec(command, timeout) -> ExecResult   # 非交互
+    def create_interactive() -> InteractiveChannel    # 交互 pty
+```
+
+**SSHTransport（asyncssh）**：
+- `connect`：`asyncssh.connect(host, port, username, password|client_keys, known_hosts=None)`。
+- `exec`：`await conn.run(cmd, check=False, term_type, term_size)`（异步等待命令完成）。
+- 交互：`conn.create_process(term_type="xterm-256color", term_size=(cols, rows))`。
+- resize：`proc.change_terminal_size(width, height)`（**注意 asyncssh 2.24 的 API**，非旧版 `resize_term`）。
+- 连接复用：exec / interactive / SFTP 共享同一 `SSHClientConnection`（多路复用通道）。
+
+**LocalTransport（开发验证）**：
+- `exec`：`asyncio.create_subprocess_shell`。
+- 交互：**`pty.fork()` + `loop.add_reader` + 非阻塞 master**（见 3.1，这是经过踩坑修正的实现）。
+
+### 2.2 会话运行时（sessions.py）
+
+`TerminalSession` 关键成员：
+
+- **环形输出缓冲**：`_parts`（文本片段）、`_chars`（当前缓冲字符数）、`_total`（累计流字符数）、`_start`（缓冲首片流偏移）。
+  - `append(text)`：追加并裁剪最旧内容到 ≤256KB。
+  - `get_buffer(since)`：返回 `{since, total, gap, data}`——`since` 落在窗口内则只回传新增，否则全量 + `gap=true`。
+- **单一写锁**：`_write_lock`，`write()` 中 `async with` 串行写入 pty。
+- **订阅者扇出**：`_read_loop` 从 pty 读 → `append` 到缓冲 → 扇出给所有 `readers`（WebSocket）。
+- **生命周期**：`connect()` 建传输 + 交互通道 + 启动读循环；`disconnect()` 取消读循环、关通道、关传输。
+
+`SessionManager`：惰性创建 `TerminalSession`（`get()`），`remove()`（async，注意原因见 3.3）、`shutdown()`（lifespan 关闭时调用）。
+
+### 2.3 存储（store.py）
+
+- `SessionStore`：`data/sessions.json` 列表格式，`threading.Lock` 保护，写时原子替换（tmp 文件 + replace）。
+- `list_all(query)`：多 token 过滤（每个 token 都是「名称+主机+端口」子串）。
+- 密码明文存储（与 xshell 同类工具一致），`_public()` 出参时剔除密码字段。
+
+### 2.4 路由
+
+**terminal.py — WS 协议**：
+- 客户端 → 服务端：`{"type":"input","data"}`、`{"type":"resize","cols","rows"}`。
+- 服务端 → 客户端：`{"type":"buffer","data"}`（历史尾）、`{"type":"output","data"}`、`{"type":"status","state"}`。
+- 连接失败（如 SSH 认证失败）→ 发 `status:error` 并 close(1011)。
+
+**ai.py — AI 双路径**：
+- `POST /write`：向共享终端写入（协同路径），需已连接。
+- `GET /buffer?since=`：增量读取（AI 用）。
+- `POST /exec`：独立路径，`build_transport(cfg)` 新建连接执行（SSH 复用会话连接），返回 `{stdout, stderr, exit_code, duration_ms, timed_out}`。
+- `POST /find`：参数经 `shlex.quote` 安全引用后组 find 命令执行。
+
+**sftp.py**：SSH 用 `conn.start_sftp_client()`（`scandir()` 列目录，条目为 `SFTPName.filename/.attrs`）；local 用 `os.scandir`/文件读写。
+
+## 3. 关键实现细节
+
+### 3.1 本地 pty 管理（重要：经踩坑修正）
+
+**背景**：初版用「读线程 + 阻塞 `os.read(master)`」，close 时从另一线程关 fd **无法唤醒**阻塞的读线程，进程陷入不可中断等待（SIGKILL 无效），导致测试整体挂死。
+
+**正解**（当前实现）：
+- `pty.fork()` 子进程 exec shell（子进程获得控制终端，job control 正常）。
+- `os.set_blocking(master, False)` + `loop.add_reader(master, on_readable)`——由事件循环驱动读取，无读线程。
+- `on_readable` 读到的数据 `put_nowait` 进 asyncio 队列；EOF 时 `remove_reader` 并推 `None` 信号。
+- `close()` 顺序：`remove_reader` → 关 fd → SIGHUP → **有界 WNOHANG 轮询**（2.5s）→ SIGKILL 兜底。绝不无限 `waitpid` 阻塞。
+
+### 3.2 增量缓冲算法
+
+```
+append(text):  parts += [text]; total += len(text)
+              while chars > 256KB: 从头部裁剪（片段级/字符级），start 前移
+
+get_buffer(since):
+  end = start + len("".join(parts))
+  if start <= since <= end:  return {since, total, gap:False, data: text[since-start:]}
+  else:                      return {since, total, gap:True,  data: text}   # 全量 + 标记 gap
+```
+
+调用方（AI）每次把返回的 `total` 作为下次的 `since`，即实现增量获取。
+
+### 3.3 同步路由不得 `asyncio.create_task`
+
+FastAPI 的同步路由跑在线程池线程里，**没有运行中的事件循环**，`asyncio.create_task` 会报 `no running event loop`。需要调 async 逻辑的路由（如删除会话要断开运行时）必须声明 `async def` 并 `await`。
+
+### 3.4 启动与 Electron 集成
+
+- `run.py`：`uvicorn.run(..., reload=True, reload_dirs=["app"])`——`reload_dirs` 限定代码目录，避免写 `data/sessions.json` 触发服务重启。
+- `electron/main.js`：`spawn(python run.py, {detached:true, env:SSHMANAGER_RELOAD=0})` → 轮询 `/api/sessions` 等后端就绪 → `BrowserWindow.loadURL` → `will-quit` 时 `process.kill(-pid, SIGTERM)` 整树终止。
+
+## 4. 前端实现
+
+- 原生 JS（Electron 友好），xterm.js + addon-fit **本地化在 `vendor/`**，离线可用。
+- **布局**：左侧边栏（会话列表 + 过滤 + 新建/导入/导出）+ 主区（终端标签栏 + 终端容器 + AI 面板）。
+- **终端**：`Terminal` + `FitAddon`，`term.onData` → WS input，`term.onResize` → WS resize，`ResizeObserver` 触发 `fit()`。
+- **WS 自适应端口**：用 `location.host` 拼 ws 地址，换端口无需改前端。
+- **AI 面板**：三种模式切换（写入终端 / 独立执行 / 递归搜索），输出区展示 exec/find 结果。
+- **导入导出**：导出=剪贴板 + 下载 JSON；导入=粘贴文本或选文件。
+
+## 5. 测试
+
+```bash
+cd backend && .venv/bin/python -m pytest tests/ -v
+```
+
+覆盖：会话 CRUD/过滤/导入导出、exec、find、终端 WS 流 + AI write + 增量 buffer、SFTP 上传/下载回环。均走 **local 传输**（与 SSH 共用上层代码路径）；SSH 需凭据环境，未自动化。
+
+## 6. 已知问题与待办
+
+### 已知问题
+- SSH 传输路径未真机验证（无凭据环境）。
+- SFTP 无前端 UI（仅 API）。
+- 密码明文存储（生产化需加密）。
+- `known_hosts=None` 不校验主机密钥（与 xshell 一致，安全权衡）。
+
+### 待办
+- [ ] 接入 AI 模型（意图解析 → exec/write；输出理解 → 决策循环）
+- [ ] AI 后台 WebSocket 长连接 + 回显浏览器的「一起干」模式
+- [ ] 快捷命令分组 + 增删查改 + 组间移动 + 导入导出
+- [ ] SFTP 前端 UI
+- [ ] 会话更新 UI（当前仅有创建/删除/过滤，PATCH API 已就绪）
+- [ ] 密码加密存储
