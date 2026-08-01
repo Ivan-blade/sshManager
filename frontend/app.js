@@ -359,7 +359,8 @@ function connectWs(key) {
   if (!tab) return;
   const id = tab.sid;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const path = tab.mode === "restore" ? `/ws/connection/${tab.connId}` : `/ws/terminal/${id}`;
+  // 已有 connId 就复用（切回 tab 不新建连接，避免后台数量堆积）；没有才新建
+  const path = tab.connId ? `/ws/connection/${tab.connId}` : `/ws/terminal/${id}`;
   const ws = new WebSocket(`${proto}://${location.host}${path}`);
   state.ws = ws;
   ws.onopen = () => {
@@ -370,6 +371,13 @@ function connectWs(key) {
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "status" && msg.conn_id) tab.connId = msg.conn_id; // 记住 conn_id（断开/恢复用）
+    if (msg.type === "status" && msg.state === "error" && tab.connId) {
+      // 连接已失效（如曾被断开）→ 退回新建连接
+      tab.connId = null;
+      try { ws.close(); } catch (_) {}
+      connectWs(key);
+      return;
+    }
     if (!state.term || activeSid() !== id) return;
     if (msg.type === "output" || msg.type === "buffer") state.term.write(msg.data || "");
     else if (msg.type === "status") {
