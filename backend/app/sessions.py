@@ -8,6 +8,7 @@
 """
 import asyncio
 import time
+import uuid
 from typing import Optional
 
 from fastapi import WebSocket
@@ -18,10 +19,16 @@ from .transports import Transport, build_transport
 
 
 class TerminalSession:
+    """一个独立的终端连接（自己的 transport + 通道 + 缓冲）。
+
+    一个会话配置（sid）可产生多个独立连接；每个 tab / 每个 AI 连接 = 一个 TerminalSession。
+    """
+
     MAX_BUF = config.TERMINAL_BUF_LIMIT
 
-    def __init__(self, session_id: str, session_cfg: dict):
-        self.id = session_id
+    def __init__(self, conn_id: str, session_cfg: dict):
+        self.id = conn_id          # 连接唯一 id
+        self.sid = session_cfg.get("id", "")
         self.cfg = session_cfg
         self.transport: Optional[Transport] = None
         self._channel = None
@@ -143,24 +150,40 @@ class TerminalSession:
 
 
 class SessionManager:
+    """运行时连接池：按 conn_id 管理。一个会话配置可产生多个独立连接。"""
+
     def __init__(self, store: SessionStore):
         self.store = store
-        self._sessions: dict[str, TerminalSession] = {}
+        self._sessions: dict[str, TerminalSession] = {}  # conn_id -> TerminalSession
 
-    def get(self, sid: str) -> Optional[TerminalSession]:
-        ts = self._sessions.get(sid)
-        if ts is None:
-            cfg = self.store.get(sid)
-            if not cfg:
-                return None
-            ts = TerminalSession(sid, cfg)
-            self._sessions[sid] = ts
+    def create(self, sid: str) -> Optional[TerminalSession]:
+        """为会话配置创建一个新的独立连接。"""
+        cfg = self.store.get(sid)
+        if not cfg:
+            return None
+        conn_id = uuid.uuid4().hex
+        ts = TerminalSession(conn_id, cfg)
+        self._sessions[conn_id] = ts
         return ts
 
-    async def remove(self, sid: str) -> None:
-        ts = self._sessions.pop(sid, None)
+    def get(self, conn_id: str) -> Optional[TerminalSession]:
+        return self._sessions.get(conn_id)
+
+    async def remove(self, conn_id: str) -> None:
+        ts = self._sessions.pop(conn_id, None)
         if ts:
             await ts.disconnect()
+
+    def is_connected(self, sid: str) -> bool:
+        return any(ts.connected for ts in self._sessions.values() if ts.sid == sid)
+
+    def active_conns(self, sid: str) -> list[str]:
+        return [ts.id for ts in self._sessions.values() if ts.sid == sid and ts.connected]
+
+    async def disconnect_sid(self, sid: str) -> None:
+        for ts in list(self._sessions.values()):
+            if ts.sid == sid:
+                await self.remove(ts.id)
 
     async def shutdown(self) -> None:
         for ts in list(self._sessions.values()):

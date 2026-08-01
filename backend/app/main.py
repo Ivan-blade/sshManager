@@ -31,6 +31,7 @@ app.include_router(sessions.router)
 app.include_router(groups.router)
 app.include_router(terminal.router)
 app.include_router(ai.router)
+app.include_router(ai.conn_router)
 app.include_router(ai.capabilities_router)
 app.include_router(sftp.router)
 

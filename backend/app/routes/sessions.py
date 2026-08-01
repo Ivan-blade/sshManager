@@ -68,7 +68,7 @@ def update_session(sid: str, body: SessionUpdate, store: StoreDep) -> dict:
 async def delete_session(sid: str, store: StoreDep, manager: ManagerDep) -> dict:
     if not store.get(sid):
         raise HTTPException(404, "session not found")
-    await manager.remove(sid)  # 断开运行时连接
+    await manager.disconnect_sid(sid)  # 断开该会话的全部连接
     store.delete(sid)
     return {"ok": True}
 
@@ -76,21 +76,22 @@ async def delete_session(sid: str, store: StoreDep, manager: ManagerDep) -> dict
 # ---- 运行时连接控制 ----
 @router.post("/{sid}/connect")
 async def connect_session(sid: str, store: StoreDep, manager: ManagerDep) -> dict:
+    """创建一个新的独立连接，返回 conn_id（AI 协作路径先拿 conn_id 再 write/buffer）。"""
     if not store.get(sid):
         raise HTTPException(404, "session not found")
-    ts = manager.get(sid)
+    ts = manager.create(sid)
     try:
         await ts.connect()
     except Exception as exc:
+        await manager.remove(ts.id)
         raise HTTPException(502, f"connect failed: {exc}")
-    return {"ok": True, "state": "connected"}
+    return {"ok": True, "conn_id": ts.id, "state": "connected"}
 
 
 @router.post("/{sid}/disconnect")
 async def disconnect_session(sid: str, manager: ManagerDep) -> dict:
-    ts = manager.get(sid)
-    if ts:
-        await ts.disconnect()
+    """断开该会话的全部连接。"""
+    await manager.disconnect_sid(sid)
     return {"ok": True, "state": "disconnected"}
 
 
@@ -98,5 +99,8 @@ async def disconnect_session(sid: str, manager: ManagerDep) -> dict:
 async def session_status(sid: str, store: StoreDep, manager: ManagerDep) -> dict:
     if not store.get(sid):
         raise HTTPException(404, "session not found")
-    ts = manager.get(sid)
-    return {"id": sid, "connected": bool(ts and ts.connected)}
+    return {
+        "id": sid,
+        "connected": manager.is_connected(sid),
+        "active_conns": manager.active_conns(sid),
+    }

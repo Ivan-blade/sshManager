@@ -1,6 +1,6 @@
 """SFTP：文件浏览 / 上传 / 下载。
 
-SSH 会话复用共享连接（`复用 ssh 连接`）；local 传输映射到本机文件系统，便于开发验证。
+每个操作使用独立传输（SSH 每次建连接；local 映射本机文件系统，便于开发验证）。
 """
 import os
 import stat
@@ -10,13 +10,12 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-from ..deps import get_manager, get_store
-from ..sessions import SessionManager
+from ..deps import get_store
 from ..store import SessionStore
+from ..transports import Transport, build_transport
 
 router = APIRouter(prefix="/api/sessions/{sid}/sftp", tags=["sftp"])
 StoreDep = Annotated[SessionStore, Depends(get_store)]
-ManagerDep = Annotated[SessionManager, Depends(get_manager)]
 
 CHUNK = 65536
 
@@ -28,16 +27,17 @@ def _require(store: SessionStore, sid: str) -> dict:
     return cfg
 
 
-async def _connected(manager: SessionManager, store: SessionStore, sid: str):
-    """确保会话已连接，返回 (cfg, TerminalSession)。local 会返回 ts 以便走文件系统。"""
+async def _ssh_transport(store: SessionStore, sid: str):
+    """local 返回 (cfg, None)；SSH 返回 (cfg, 已连接的 transport)。"""
     cfg = _require(store, sid)
-    ts = manager.get(sid)
-    if not ts.connected:
-        try:
-            await ts.connect()
-        except Exception as exc:
-            raise HTTPException(502, f"connect failed: {exc}")
-    return cfg, ts
+    if cfg["transport"] == "local":
+        return cfg, None
+    transport = build_transport(cfg)
+    try:
+        await transport.connect()
+    except Exception as exc:
+        raise HTTPException(502, f"connect failed: {exc}")
+    return cfg, transport
 
 
 def _local_entry(path: Path) -> dict:
@@ -47,20 +47,16 @@ def _local_entry(path: Path) -> dict:
 
 
 @router.get("/ls")
-async def sftp_ls(sid: str, store: StoreDep, manager: ManagerDep,
-                  path: str = ".") -> list[dict]:
-    cfg, ts = await _connected(manager, store, sid)
+async def sftp_ls(sid: str, store: StoreDep, path: str = ".") -> list[dict]:
+    cfg, transport = await _ssh_transport(store, sid)
+
     if cfg["transport"] == "local":
         base = Path(path).expanduser()
         if not base.is_dir():
             raise HTTPException(404, "path not a directory")
-        entries = []
-        for child in sorted(base.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
-            entries.append(_local_entry(child))
-        return entries
+        return [_local_entry(p) for p in sorted(base.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))]
 
-    conn = ts.transport.conn  # type: ignore[attr-defined]
-    sftp = await conn.start_sftp_client()
+    sftp = await transport.conn.start_sftp_client()  # type: ignore[attr-defined]
     try:
         out = []
         async for name in sftp.scandir(path):
@@ -76,12 +72,12 @@ async def sftp_ls(sid: str, store: StoreDep, manager: ManagerDep,
     finally:
         sftp.exit()
         await sftp.wait_closed()
+        await transport.close()
 
 
 @router.get("/download")
-async def sftp_download(sid: str, store: StoreDep, manager: ManagerDep,
-                        path: str) -> StreamingResponse:
-    cfg, ts = await _connected(manager, store, sid)
+async def sftp_download(sid: str, store: StoreDep, path: str) -> StreamingResponse:
+    cfg, transport = await _ssh_transport(store, sid)
     fname = os.path.basename(path.rstrip("/")) or "download"
 
     if cfg["transport"] == "local":
@@ -96,8 +92,7 @@ async def sftp_download(sid: str, store: StoreDep, manager: ManagerDep,
         return StreamingResponse(iter_local(), media_type="application/octet-stream",
                                  headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
-    conn = ts.transport.conn  # type: ignore[attr-defined]
-    sftp = await conn.start_sftp_client()
+    sftp = await transport.conn.start_sftp_client()  # type: ignore[attr-defined]
 
     async def iter_sftp():
         try:
@@ -113,17 +108,18 @@ async def sftp_download(sid: str, store: StoreDep, manager: ManagerDep,
         finally:
             sftp.exit()
             await sftp.wait_closed()
+            await transport.close()
 
     return StreamingResponse(iter_sftp(), media_type="application/octet-stream",
                              headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @router.post("/upload")
-async def sftp_upload(sid: str, store: StoreDep, manager: ManagerDep,
+async def sftp_upload(sid: str, store: StoreDep,
                       target_dir: str = Form("."),
                       target_name: str = Form(""),
                       file: UploadFile = File(...)) -> dict:
-    cfg, ts = await _connected(manager, store, sid)
+    cfg, transport = await _ssh_transport(store, sid)
     name = target_name or file.filename or "upload"
 
     if cfg["transport"] == "local":
@@ -137,8 +133,7 @@ async def sftp_upload(sid: str, store: StoreDep, manager: ManagerDep,
             raise HTTPException(502, f"upload failed: {exc}")
         return {"ok": True, "path": str(dest), "size": dest.stat().st_size}
 
-    conn = ts.transport.conn  # type: ignore[attr-defined]
-    sftp = await conn.start_sftp_client()
+    sftp = await transport.conn.start_sftp_client()  # type: ignore[attr-defined]
     try:
         dest = os.path.join(target_dir, name)
         f = await sftp.open(dest, "wb")
@@ -154,3 +149,4 @@ async def sftp_upload(sid: str, store: StoreDep, manager: ManagerDep,
     finally:
         sftp.exit()
         await sftp.wait_closed()
+        await transport.close()

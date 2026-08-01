@@ -48,26 +48,36 @@ def _require_session(store: SessionStore, sid: str):
     return cfg
 
 
-@router.post("/write")
-async def ai_write(sid: str, body: TerminalInput, store: StoreDep, manager: ManagerDep) -> dict:
-    """协同路径：向共享终端写入数据（AI 干涉），输出会进入终端缓冲并回显给所有订阅者。"""
-    _require_session(store, sid)
-    ts = manager.get(sid)
+# AI 连接作用域（每个 conn_id 是一个独立终端实例）：
+# 先 POST /api/sessions/{sid}/connect 拿 conn_id，再 write/buffer/disconnect。
+conn_router = APIRouter(prefix="/api/connections", tags=["ai-connection"])
+
+
+@conn_router.post("/{conn_id}/write")
+async def conn_write(conn_id: str, body: TerminalInput, manager: ManagerDep) -> dict:
+    """协同路径：向指定终端连接写入数据（AI 干涉），输出进入该连接缓冲并回显给其订阅者。"""
+    ts = manager.get(conn_id)
     if not ts or not ts.connected:
-        raise HTTPException(409, "session not connected")
+        raise HTTPException(409, "connection not connected")
     await ts.write(body.data)
-    return {"ok": True, "written": len(body.data)}
+    return {"ok": True, "conn_id": conn_id, "written": len(body.data)}
 
 
-@router.get("/buffer")
-async def ai_buffer(sid: str, store: StoreDep, manager: ManagerDep,
-                    since: int = Query(0, ge=0)) -> dict:
-    """增量获取终端输出缓冲。since 为上次返回的 total；gap=true 表示 since 已超出缓冲窗口，需全量同步。"""
-    _require_session(store, sid)
-    ts = manager.get(sid)
+@conn_router.get("/{conn_id}/buffer")
+async def conn_buffer(conn_id: str, manager: ManagerDep,
+                      since: int = Query(0, ge=0)) -> dict:
+    """增量获取指定终端连接的输出缓冲。since 为上次返回的 total；gap=true 表示偏移已超出窗口。"""
+    ts = manager.get(conn_id)
     if ts is None:
         return {"since": since, "total": 0, "gap": True, "data": ""}
     return ts.get_buffer(since)
+
+
+@conn_router.post("/{conn_id}/disconnect")
+async def conn_disconnect(conn_id: str, manager: ManagerDep) -> dict:
+    """断开指定终端连接。"""
+    await manager.remove(conn_id)
+    return {"ok": True, "conn_id": conn_id, "state": "disconnected"}
 
 
 @router.post("/exec")

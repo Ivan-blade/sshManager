@@ -79,14 +79,15 @@ def test_find_local(client, local_session):
 
 
 def test_terminal_ws_and_ai_write(client, local_session):
-    assert client.post(f"/api/sessions/{local_session}/connect").status_code == 200
-
     with client.websocket_connect(f"/ws/terminal/{local_session}") as ws:
-        # 初始：读到 buffer 尾 + status 为止（shell 横幅等 output 消息可能穿插）
-        seen = set()
-        while not {"buffer", "status"} <= seen:
-            seen.add(ws.receive_json()["type"])
-        assert {"buffer", "status"} <= seen
+        # 初始：读到 buffer 尾 + status（status 带 conn_id）
+        seen = {}
+        while not ({"buffer", "status"} <= seen.keys()):
+            m = ws.receive_json()
+            seen[m["type"]] = m
+        assert "buffer" in seen and "status" in seen
+        conn_id = seen["status"].get("conn_id")
+        assert conn_id, "ws 应返回 conn_id"
 
         # 人的输入 → 终端回显
         ws.send_json({"type": "input", "data": "echo WS_TEST_OK\n"})
@@ -98,21 +99,24 @@ def test_terminal_ws_and_ai_write(client, local_session):
         # resize
         ws.send_json({"type": "resize", "cols": 100, "rows": 30})
 
-    # AI 协同路径：write 注入共享终端
-    r = client.post(f"/api/sessions/{local_session}/write", json={"data": "echo AI_WRITE_OK\n"})
-    assert r.status_code == 200, r.text
-    time.sleep(0.8)
-    b = client.get(f"/api/sessions/{local_session}/buffer", params={"since": 0}).json()
-    assert "AI_WRITE_OK" in b["data"] and b["gap"] is False
+        # AI 协同路径：向该连接 write 注入
+        r = client.post(f"/api/connections/{conn_id}/write", json={"data": "echo AI_WRITE_OK\n"})
+        assert r.status_code == 200, r.text
+        time.sleep(0.8)
 
-    # 增量：since 为前一次的 total 附近 → 只回传新内容
-    total = b["total"]
-    b2 = client.get(f"/api/sessions/{local_session}/buffer", params={"since": total - 5}).json()
-    assert b2["total"] == total and b2["gap"] is False
+        # 增量 buffer
+        b = client.get(f"/api/connections/{conn_id}/buffer", params={"since": 0}).json()
+        assert "AI_WRITE_OK" in b["data"] and b["gap"] is False
+        total = b["total"]
+        b2 = client.get(f"/api/connections/{conn_id}/buffer", params={"since": total - 5}).json()
+        assert b2["total"] == total and b2["gap"] is False
+        b3 = client.get(f"/api/connections/{conn_id}/buffer", params={"since": 10**9}).json()
+        assert b3["gap"] is True
 
-    # 过期 since → gap
-    b3 = client.get(f"/api/sessions/{local_session}/buffer", params={"since": 10**9}).json()
-    assert b3["gap"] is True
+    # ws 关闭后该连接应已释放
+    time.sleep(0.3)
+    st = client.get(f"/api/sessions/{local_session}/status").json()
+    assert st["active_conns"] == []
 
 
 def test_session_id_unique_per_host(client):
@@ -164,6 +168,31 @@ def test_groups_crud_and_move(client):
             client.delete(f"/api/sessions/{sid}")
         if gid:
             client.delete(f"/api/groups/{gid}")
+
+
+def test_independent_connections(client, local_session):
+    """同一会话可建多个独立连接：conn_id 不同、缓冲互不共享。"""
+    r1 = client.post(f"/api/sessions/{local_session}/connect")
+    r2 = client.post(f"/api/sessions/{local_session}/connect")
+    assert r1.status_code == 200 and r2.status_code == 200, (r1.text, r2.text)
+    c1, c2 = r1.json()["conn_id"], r2.json()["conn_id"]
+    assert c1 != c2
+
+    # AI write 到 conn1 → 只进 conn1 的缓冲
+    assert client.post(f"/api/connections/{c1}/write", json={"data": "echo ONLY_C1\n"}).status_code == 200
+    time.sleep(0.8)
+    b1 = client.get(f"/api/connections/{c1}/buffer", params={"since": 0}).json()
+    b2 = client.get(f"/api/connections/{c2}/buffer", params={"since": 0}).json()
+    assert "ONLY_C1" in b1["data"]
+    assert "ONLY_C1" not in b2["data"]
+
+    # 状态返回活跃连接数
+    st = client.get(f"/api/sessions/{local_session}/status").json()
+    assert c1 in st["active_conns"] and c2 in st["active_conns"]
+
+    # 清理
+    client.post(f"/api/connections/{c1}/disconnect")
+    client.post(f"/api/connections/{c2}/disconnect")
 
 
 def test_ai_capabilities(client):
