@@ -133,18 +133,26 @@ async def ai_find(sid: str, body: FindRequest, store: StoreDep) -> dict:
         # 无通配符时做模糊子串匹配：123 → *123*（匹配 123.txt 等）
         if not any(c in pattern for c in "*?["):
             pattern = f"*{pattern}*"
-        parts = ["find", shlex.quote(body.path)]
-        if body.max_depth is not None:
-            parts += ["-maxdepth", str(body.max_depth)]
-        parts += ["-name", shlex.quote(pattern)]
-        if body.ftype != "all":
-            parts += ["-type", body.ftype]
-        result = await transport.exec(" ".join(parts), timeout=60)
+        # ftype=all 时同时搜文件与目录，条目带 is_dir
+        types = ["f", "d"] if body.ftype == "all" else [body.ftype]
+        entries = []
+        stderr = ""
+        for t in types:
+            parts = ["find", shlex.quote(body.path)]
+            if body.max_depth is not None:
+                parts += ["-maxdepth", str(body.max_depth)]
+            parts += ["-name", shlex.quote(pattern), "-type", t]
+            result = await transport.exec(" ".join(parts), timeout=60)
+            stderr += result.stderr or ""
+            for ln in (result.stdout or "").splitlines():
+                if ln.strip():
+                    entries.append({"path": ln.strip(), "is_dir": t == "d"})
+        entries.sort(key=lambda e: (not e["is_dir"], e["path"].lower()))
     finally:
         await transport.close()
-    lines = [ln for ln in (result.stdout or "").splitlines() if ln.strip()]
     return {
-        "results": lines, "count": len(lines),
-        "stderr": result.stderr, "exit_code": result.exit_code,
+        "results": [e["path"] for e in entries],
+        "entries": entries, "count": len(entries),
+        "stderr": stderr, "exit_code": result.exit_code,
         "duration_ms": result.duration_ms,
     }

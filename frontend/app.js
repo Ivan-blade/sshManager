@@ -1305,21 +1305,25 @@ async function sftpSearch() {
   list.innerHTML = '<div class="sftp-loading">搜索中…</div>';
   let r;
   try {
-    r = await api(`/api/sessions/${state.sftpSid}/find`, { method: "POST", body: { path: state.sftpPath, pattern: q, ftype: "f" } });
+    // ftype=all：文件和目录都搜；条目带 is_dir
+    r = await api(`/api/sessions/${state.sftpSid}/find`, { method: "POST", body: { path: state.sftpPath, pattern: q, ftype: "all" } });
   } catch (err) { list.innerHTML = `<div class="sftp-empty">搜索失败：${err.message}</div>`; return; }
   list.innerHTML = "";
-  if (!r.results.length) { list.innerHTML = '<div class="sftp-empty">（无匹配）</div>'; return; }
-  for (const p of r.results) {
+  const entries = (r.entries && r.entries.length)
+    ? r.entries
+    : (r.results || []).map((p) => ({ path: p, is_dir: false }));
+  if (!entries.length) { list.innerHTML = '<div class="sftp-empty">（无匹配）</div>'; return; }
+  for (const en of entries) {
+    const p = en.path;
     const row = document.createElement("div");
-    row.className = "sftp-item";
-    const icon = document.createElement("span"); icon.className = "sftp-icon"; icon.textContent = "·";
+    row.className = "sftp-item" + (en.is_dir ? " dir" : "");
+    const icon = document.createElement("span"); icon.className = "sftp-icon"; icon.textContent = en.is_dir ? "▸" : "·";
     const nm = document.createElement("span"); nm.className = "sftp-name"; nm.textContent = p;
     row.append(icon, nm);
-    // 单击跳转到该文件所在目录（搜索即定位）
     row.addEventListener("click", () => {
-      const dir = p.lastIndexOf("/") > 0 ? p.slice(0, p.lastIndexOf("/")) : ".";
       $("#sftp-search").value = "";
-      state.sftpPath = dir;
+      if (en.is_dir) state.sftpPath = p; // 文件夹 → 进入
+      else state.sftpPath = p.lastIndexOf("/") > 0 ? p.slice(0, p.lastIndexOf("/")) : "."; // 文件 → 父目录
       loadSftp();
     });
     row.addEventListener("contextmenu", (ev) => { ev.preventDefault(); showFileMenu(ev, p); });
