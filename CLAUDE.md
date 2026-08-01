@@ -80,19 +80,30 @@ Python 后端 ──▶ PTY ──▶ 远端 shell/SSH（local 传输则是本�
 - **单一写锁**：所有来源（人 ws / AI write 接口）的输入串行进 pty，缓解并发交错。
 - `SessionManager` 惰性建运行时；`remove()`/`delete` 路由必须是 async（避免 sync 线程里 `create_task` 报 "no running event loop"）。
 
+### 存储（backend/app/store.py、quickstore.py）
+
+- 两个独立存储单例，由 `deps.py` 用 `@lru_cache` 暴露：`SessionStore`（`data/sessions.json` + `data/groups.json`）与 `QuickStore`（`data/quick.json`）。
+- 所有写盘都是**原子写**：先写 `.json.tmp` 再 `replace`。
+- 密码明文存于 `data/sessions.json`（gitignored），与 xshell 同类工具一致。
+
 ### API 路由（backend/app/routes/）
 
 | 文件 | 职责 |
 |------|------|
-| `sessions.py` | 会话 CRUD + IP/名称同时过滤 + JSON 导入导出 + connect/disconnect/status |
+| `sessions.py` | 会话 CRUD + IP/名称同时过滤 + connect/disconnect/status |
+| `groups.py` | 会话分组 CRUD（删除分组时组内会话回根层级） |
+| `transfer.py` | 导入/导出（分组+会话，按选择筛选、文件/剪贴板；导入按名称去重、重写 group_id） |
 | `terminal.py` | `WS /ws/terminal/{id}` 终端流（input/resize → 服务端；buffer/output/status ← 服务端） |
-| `ai.py` | **AI 双路径**：`POST /write`（协同，写共享终端）/ `POST /exec`（独立，非交互直接返回）/ `GET /buffer`（增量）/ `POST /find`（递归搜索，`shlex.quote` 防注入） |
-| `sftp.py` | SFTP ls/upload/download；SSH 复用会话连接，local 映射本机文件系统 |
+| `ai.py` | **AI 双路径**：`POST /write`（协同，写共享终端）/ `POST /exec`（独立，非交互直接返回）/ `GET /buffer`（增量）/ `POST /find`（递归搜索，`shlex.quote` 防注入）。同文件另注册两个 router：`conn_router`（`/api/connections/*`，按 **conn_id** 对后台连接 write/buffer/disconnect + `GET /background` 列出全部后台保活连接）与 `capabilities_router`（AI 能力发现） |
+| `capabilities.py` | AI 能力注册表（name/method/path/summary，body schema 从 Pydantic 模型推导），供 AI agent 自举发现后端能做什么、怎么调 |
+| `quick.py` | 快捷命令分组 + 命令 CRUD + 导入导出（`/api/quick`） |
+| `sftp.py` | SFTP ls/upload/download/edit/delete/递归搜索；SSH 复用会话连接，local 映射本机文件系统 |
 
 ## AI 设计
 
-- **协同路径**（`/write`）：AI 注入共享终端，输出进缓冲并对所有订阅者回显。有并发问题，靠写锁 + 空闲注入缓解。
+- **协同路径**（`/write`）：AI 注入共享终端，输出进缓冲并对所有订阅者回显。有并发问题，靠写锁 + 空闲注入缓解。连接级等效接口在 `/api/connections/{conn_id}/write`。
 - **独立路径**（`/exec`、`/find`）：非交互执行直接返回，不经过共享终端，无并发问题，**默认优先**。
+- **能力发现**：`GET /api/ai/capabilities`（概述）→ `GET /api/ai/capabilities/{name}`（参数详情）→ 调用对应 REST 接口，AI agent 据此自举（见 `capabilities.py`）。
 - 待实现：AI 模型接入（把意图/输出理解接到这些接口上）；三种后台操作形态（非交互 / 交互 / WebSocket 长连接回显浏览器实现「一起干」）。
 
 ## 前端（frontend/）
@@ -109,6 +120,7 @@ Python 后端 ──▶ PTY ──▶ 远端 shell/SSH（local 传输则是本�
 
 ## 已知事项
 
+- Electron 壳（`frontend/electron/main.js`）：以 `SSHMANAGER_RELOAD=0`、detached 进程组拉起后端，轮询 `/api/sessions` 就绪后加载页面。**SFTP 下载必须走 `session.defaultSession` 的 `will-download` 拦截弹原生保存对话框**——否则 Electron 会弹空白下载窗口。
 - 密码明文存于 `data/sessions.json`（gitignored；与 xshell 同类工具一致），生产化应加密。
 - `known_hosts=None`：不校验主机密钥（与 xshell 一致）。
 - 本地测试主机 `ssh root@192.168.8.101`（私有本地 IP，无免密凭据）。
