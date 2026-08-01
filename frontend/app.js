@@ -94,7 +94,7 @@ function renderTree() {
     const empty = document.createElement("div");
     empty.className = "tree-item";
     empty.style.cssText = "color:var(--text-faint);cursor:default";
-    empty.textContent = state.filter ? "无匹配会话" : "暂无会话，点右上角「新建会话」";
+    empty.textContent = state.filter ? "No matching sessions" : "No sessions yet, click + Session";
     frag.append(empty);
   }
   nav.append(frag);
@@ -123,9 +123,9 @@ function _groupNode(g, items, style) {
   row.addEventListener("contextmenu", (e) => {
     e.preventDefault(); e.stopPropagation();
     showCtx(e.clientX, e.clientY, [
-      { label: "在此分组新建会话", action: "newInGroup" },
-      { label: "重命名分组", action: "renameGroup" },
-      { label: "删除分组", action: "deleteGroup", danger: true },
+      { label: "New session here", action: "newInGroup" },
+      { label: "Rename group", action: "renameGroup" },
+      { label: "Delete group", action: "deleteGroup", danger: true },
     ]);
     state.ctxTarget = { type: "group", id: g.id, name: g.name };
   });
@@ -148,11 +148,11 @@ function _sessionNode(s, style) {
   const st = document.createElement("span");
   st.className = "sess-status off";
   st.dataset.status = s.id;
-  st.innerHTML = '<span class="sdot"></span><span class="stext">离线</span>';
+  st.innerHTML = '<span class="sdot"></span><span class="stext">Offline</span>';
   // 重建列表时从已知状态初始化，避免单击选中触发 renderTree 后闪成「离线」
   const _bgN = (state.bg[s.id] || []).length;
-  if (_bgN > 0) { st.className = "sess-status bg"; st.querySelector(".stext").textContent = `后台 ×${_bgN}`; }
-  else if (state.statuses[s.id] === "on") { st.className = "sess-status on"; st.querySelector(".stext").textContent = "运行中"; }
+  if (_bgN > 0) { st.className = "sess-status bg"; st.querySelector(".stext").textContent = `Background ×${_bgN}`; }
+  else if (state.statuses[s.id] === "on") { st.className = "sess-status on"; st.querySelector(".stext").textContent = "Running"; }
   const meta = document.createElement("span");
   meta.className = "sess-meta";
   const name = document.createElement("div");
@@ -161,7 +161,7 @@ function _sessionNode(s, style) {
   const host = document.createElement("div");
   host.className = "sess-host";
   host.textContent = s.transport === "local"
-    ? "local · 本地 Shell"
+    ? "local · Local Shell"
     : `${s.username}@${s.host}:${s.port}`;
   meta.append(name, host);
 
@@ -171,19 +171,19 @@ function _sessionNode(s, style) {
     e.preventDefault(); e.stopPropagation();
     const bg = state.bg[s.id] || [];
     const items = [
-      { label: "打开", action: "open" },
+      { label: "Open", action: "open" },
     ];
     if (bg.length) {
       items.push(
-        { label: "恢复到后台连接", action: "restoreBg" },
-        { label: "断开后台连接", action: "disconnectBg" },
+        { label: "Restore background", action: "restoreBg" },
+        { label: "Disconnect background", action: "disconnectBg" },
       );
     }
     items.push(
-      { label: "以新连接打开", action: "openNew" },
-      { label: "移动到分组…", action: "move" },
-      { label: "重命名", action: "renameSession" },
-      { label: "删除", action: "deleteSession", danger: true },
+      { label: "Open new connection", action: "openNew" },
+      { label: "Move to group…", action: "move" },
+      { label: "Rename", action: "renameSession" },
+      { label: "Delete", action: "deleteSession", danger: true },
     );
     showCtx(e.clientX, e.clientY, items);
     state.ctxTarget = { type: "session", id: s.id, name: s.name };
@@ -193,11 +193,11 @@ function _sessionNode(s, style) {
   const act = document.createElement("span");
   act.className = "sess-actions";
   const editBtn = document.createElement("button");
-  editBtn.className = "icon-btn small icon-edit"; editBtn.title = "编辑会话";
+  editBtn.className = "icon-btn small icon-edit"; editBtn.title = "Edit session";
   editBtn.textContent = "✎";
   editBtn.addEventListener("click", (e) => { e.stopPropagation(); openEditModal(s.id); });
   const delBtn = document.createElement("button");
-  delBtn.className = "icon-btn small danger"; delBtn.title = "删除会话";
+  delBtn.className = "icon-btn small danger"; delBtn.title = "Delete session";
   delBtn.textContent = "✕";
   delBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
@@ -224,7 +224,7 @@ function setStatus(sid, cls, text) {
   if (!el) return;
   el.className = "sess-status " + (cls === "on" ? "on" : cls === "bg" ? "bg" : "off");
   const txt = el.querySelector(".stext");
-  if (txt) txt.textContent = text || (cls === "on" ? "运行中" : cls === "bg" ? "后台" : "离线");
+  if (txt) txt.textContent = text || (cls === "on" ? "Running" : cls === "bg" ? "Background" : "Offline");
 }
 
 async function refreshStatuses() {
@@ -232,10 +232,10 @@ async function refreshStatuses() {
     try {
       const st = await api(`/api/sessions/${s.id}/status`);
       state.bg[s.id] = st.background_conns || [];
-      if (state.bg[s.id].length) setStatus(s.id, "bg", `后台 ×${state.bg[s.id].length}`);
-      else if (st.connected) setStatus(s.id, "on", "运行中");
-      else setStatus(s.id, "off", "离线");
-    } catch (_) { setStatus(s.id, "off", "离线"); }
+      if (state.bg[s.id].length) setStatus(s.id, "bg", `Background ×${state.bg[s.id].length}`);
+      else if (st.connected) setStatus(s.id, "on", "Running");
+      else setStatus(s.id, "off", "Offline");
+    } catch (_) { setStatus(s.id, "off", "Offline"); }
   }
   refreshBgCount();
 }
@@ -264,12 +264,12 @@ function renderTabs() {
     actions.className = "t-actions";
     const close = document.createElement("button");
     close.className = "t-btn t-close";
-    close.title = "仅关闭页面（SSH 后台保活）";
+    close.title = "Close tab only (SSH keeps running)";
     close.textContent = "✕";
     close.addEventListener("click", (e) => { e.stopPropagation(); closeTab(t.key); });
     const power = document.createElement("button");
     power.className = "t-btn t-power";
-    power.title = "断开 SSH 并关闭";
+    power.title = "Disconnect SSH & close";
     power.textContent = "⏻";
     power.addEventListener("click", (e) => { e.stopPropagation(); closeWithDisconnect(t.key); });
     actions.append(close, power);
@@ -279,9 +279,9 @@ function renderTabs() {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault(); e.stopPropagation();
       showCtx(e.clientX, e.clientY, [
-        { label: "重命名 Tab", action: "renameTab" },
-        { label: "断开连接并关闭", onSelect: () => closeWithDisconnect(t.key) },
-        { label: "仅关闭页面（SSH 后台保活）", onSelect: () => { closeTab(t.key); refreshStatuses(); } },
+        { label: "Rename Tab", action: "renameTab" },
+        { label: "Disconnect & Close", onSelect: () => closeWithDisconnect(t.key) },
+        { label: "Close tab only (SSH keeps running)", onSelect: () => { closeTab(t.key); refreshStatuses(); } },
       ]);
       state.ctxTarget = { type: "tab", key: t.key };
     });
@@ -428,7 +428,7 @@ function connectWs(key) {
     if (msg.type === "output" || msg.type === "buffer") state.term.write(msg.data || "");
     else if (msg.type === "status") {
       const on = msg.state === "connected";
-      setStatus(id, on ? "on" : "off", on ? "运行中" : "离线");
+      setStatus(id, on ? "on" : "off", on ? "Running" : "Offline");
       renderTabs();
     }
   };
@@ -436,7 +436,7 @@ function connectWs(key) {
     if (activeSid() === id) renderTabs();
     refreshStatuses();
   };
-  ws.onerror = () => { if (activeSid() === id) setStatus(id, "off", "错误"); };
+  ws.onerror = () => { if (activeSid() === id) setStatus(id, "off", "Error"); };
 }
 
 // ==========================================================================
@@ -536,7 +536,7 @@ async function runCtxAction(action) {
   else if (action === "renameTab" && t.type === "tab") {
     const tab = state.tabs.find((x) => x.key === t.key);
     if (!tab) return;
-    promptModal("重命名 Tab", tab.name, (v) => {
+    promptModal("Rename Tab", tab.name, (v) => {
       if (!v) return;
       tab.name = v;
       tab.custom = true;
@@ -559,10 +559,10 @@ async function runCtxAction(action) {
     await loadAll();
     refreshStatuses();
   }
-  else if (action === "renameGroup") promptModal("重命名分组", t.name, async (v) => {
+  else if (action === "renameGroup") promptModal("Rename group", t.name, async (v) => {
     if (v) { await api(`/api/groups/${t.id}`, { method: "PATCH", body: { name: v } }); await loadAll(); }
   });
-  else if (action === "renameSession") promptModal("重命名会话", t.name, async (v) => {
+  else if (action === "renameSession") promptModal("Rename session", t.name, async (v) => {
     if (v) {
       await api(`/api/sessions/${t.id}`, { method: "PATCH", body: { name: v } });
       state.tabs.forEach((tb) => { if (tb.sid === t.id) tb.name = v; });
@@ -580,11 +580,11 @@ async function runCtxAction(action) {
     moveModal(t.id, t.name);
   }
   else if (action === "deleteGroup") {
-    if (!confirm(`删除分组「${t.name}」？组内会话将回到根层级。`)) return;
+    if (!confirm(`Delete group "${t.name}"? Sessions will return to root.`)) return;
     await api(`/api/groups/${t.id}`, { method: "DELETE" });
     await loadAll();
   }
-  else if (action === "quickRenameGroup" && t.type === "quickGroup") promptModal("重命名分组", t.name, async (v) => {
+  else if (action === "quickRenameGroup" && t.type === "quickGroup") promptModal("Rename group", t.name, async (v) => {
     if (v) { await api(`/api/quick/groups/${t.id}`, { method: "PATCH", body: { name: v } }); await loadQuick(); }
   });
   else if (action === "quickDeleteGroup" && t.type === "quickGroup") {
@@ -648,7 +648,7 @@ $("#mp-input").addEventListener("keydown", (e) => {
 // 移动分组
 function moveModal(sid, sname) {
   const sel = $("#mm-select");
-  sel.innerHTML = '<option value="">无分组（根层级）</option>';
+  sel.innerHTML = '<option value="">No group (root)</option>';
   for (const g of state.groups) {
     const o = document.createElement("option");
     o.value = g.id;
@@ -676,7 +676,7 @@ state.movingSid = null;
 function populateGroupSelect() {
   const sel = $("#n-group");
   const keep = sel.value;
-  sel.innerHTML = '<option value="">无分组</option>';
+  sel.innerHTML = '<option value="">No Group</option>';
   for (const g of state.groups) {
     const o = document.createElement("option");
     o.value = g.id; o.textContent = g.name;
@@ -698,7 +698,7 @@ function toggleAuth() {
 
 async function submitNew() {
   const name = $("#n-name").value.trim();
-  if (!name) return toast("名称不能为空");
+  if (!name) return toast("Name is required");
   const isSsh = $("#n-transport").value === "ssh";
   const body = {
     name,
@@ -738,8 +738,8 @@ function toast(msg) { alert(msg); }
 
 function openNewModal() {
   state.editingSid = null;
-  $("#n-title").textContent = "新建会话";
-  $("#n-submit").textContent = "创建";
+  $("#n-title").textContent = "New Session";
+  $("#n-submit").textContent = "Create";
   populateGroupSelect();
   toggleNewFields();
   ["#n-name", "#n-desc", "#n-password", "#n-key"].forEach((s) => $(s).value = "");
@@ -756,8 +756,8 @@ function openEditModal(sid) {
   const s = sessionById(sid);
   if (!s) return;
   state.editingSid = sid;
-  $("#n-title").textContent = "编辑会话";
-  $("#n-submit").textContent = "保存";
+  $("#n-title").textContent = "Edit Session";
+  $("#n-submit").textContent = "Save";
   populateGroupSelect();
   $("#n-name").value = s.name || "";
   $("#n-desc").value = s.description || "";
@@ -794,7 +794,7 @@ function renderExportList(sel, items, type) {
   const box = $(sel);
   box.innerHTML = "";
   if (!items.length) {
-    box.innerHTML = '<div class="exp-empty">（无）</div>';
+    box.innerHTML = '<div class="exp-empty">(none)</div>';
     return;
   }
   for (const it of items) {
@@ -833,7 +833,7 @@ async function doExport(mode) {
   const json = JSON.stringify(data, null, 2);
   if (mode === "clipboard") {
     try { await navigator.clipboard.writeText(json); }
-    catch (_) { return toast("剪贴板不可用，请用「下载文件」"); }
+    catch (_) { return toast("Clipboard unavailable, use Download File"); }
   } else {
     const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement("a");
@@ -857,10 +857,10 @@ function openImportModal() {
 }
 
 function parseImport(text) {
-  if (!text || !text.trim()) return { error: "内容为空" };
+  if (!text || !text.trim()) return { error: "Empty content" };
   let data;
-  try { data = JSON.parse(text); } catch (_) { return { error: "JSON 解析失败" }; }
-  if (!data || !Array.isArray(data.sessions)) return { error: "格式不正确：应为 {groups, sessions}" };
+  try { data = JSON.parse(text); } catch (_) { return { error: "Invalid JSON" }; }
+  if (!data || !Array.isArray(data.sessions)) return { error: "Invalid format: expected {groups, sessions}" };
   return { data: { groups: data.groups || [], sessions: data.sessions } };
 }
 
@@ -930,7 +930,7 @@ async function renderBgPanel() {
   $("#bg-count").textContent = bg.length;
   list.innerHTML = "";
   if (!bg.length) {
-    list.innerHTML = '<div class="bg-empty">没有后台连接</div>';
+    list.innerHTML = '<div class="bg-empty">No background connections</div>';
     return;
   }
   for (const c of bg) {
@@ -944,10 +944,10 @@ async function renderBgPanel() {
     hs.className = "bg-host"; hs.textContent = c.host || c.transport || "";
     info.append(nm, hs);
     const res = document.createElement("button");
-    res.className = "btn small"; res.textContent = "恢复";
+    res.className = "btn small"; res.textContent = "Restore";
     res.addEventListener("click", (e) => { e.stopPropagation(); openTab(c.sid, c.conn_id, "restore"); hideBgPanel(); });
     const disc = document.createElement("button");
-    disc.className = "btn small danger"; disc.textContent = "断开";
+    disc.className = "btn small danger"; disc.textContent = "Disconnect";
     disc.addEventListener("click", async (e) => {
       e.stopPropagation();
       try { await api(`/api/connections/${c.conn_id}/disconnect`, { method: "POST" }); } catch (_) {}
@@ -955,7 +955,7 @@ async function renderBgPanel() {
       refreshStatuses();
     });
     row.append(info, res, disc);
-    row.title = "点击恢复";
+    row.title = "Click to restore";
     row.addEventListener("click", () => { openTab(c.sid, c.conn_id, "restore"); hideBgPanel(); }); // 整行可点恢复
     list.append(row);
   }
@@ -990,7 +990,7 @@ async function loadQuick() {
 
 function renderQuick() {
   const active = state.quickGroups.find((g) => g.id === state.quickActiveGroup);
-  $("#quick-group-btn").textContent = (active ? active.name : "默认分组") + " ▾";
+  $("#quick-group-btn").textContent = (active ? active.name : "Default Group") + " ▾";
 
   // 移除旧的 +（动态放置）
   document.querySelectorAll("#quickbar .quick-add-cmd").forEach((b) => b.remove());
@@ -1002,7 +1002,7 @@ function renderQuick() {
 
   const addBtn = document.createElement("button");
   addBtn.className = "icon-btn quick-add-cmd";
-  addBtn.title = "新建命令";
+  addBtn.title = "New command";
   addBtn.textContent = "＋";
   addBtn.addEventListener("click", () => openQuickCmdModal(null));
 
@@ -1016,12 +1016,12 @@ function renderQuick() {
       btn.addEventListener("contextmenu", (e) => {
         e.preventDefault(); e.stopPropagation();
         showCtx(e.clientX, e.clientY, [
-          { label: "编辑", action: "quickEditCmd" },
-          { label: "切换分组", submenu: [
-            { label: "默认分组", onSelect: () => moveQuickCmd(c.id, null) },
+          { label: "Edit", action: "quickEditCmd" },
+          { label: "Move to group", submenu: [
+            { label: "Default Group", onSelect: () => moveQuickCmd(c.id, null) },
             ...state.quickGroups.map((g) => ({ label: g.name, onSelect: () => moveQuickCmd(c.id, g.id) })),
           ]},
-          { label: "删除", action: "quickDeleteCmd", danger: true },
+          { label: "Delete", action: "quickDeleteCmd", danger: true },
         ]);
         state.ctxTarget = { type: "quickCmd", id: c.id, name: c.name };
       });
@@ -1039,9 +1039,9 @@ function buildInlineGroupInput() {
   const row = document.createElement("div");
   row.className = "qgm-item qgm-input";
   const input = document.createElement("input");
-  input.placeholder = "分组名称";
+  input.placeholder = "Group name";
   const ok = document.createElement("button");
-  ok.className = "icon-btn small"; ok.textContent = "✓"; ok.title = "确定";
+  ok.className = "icon-btn small"; ok.textContent = "✓"; ok.title = "OK";
   const commit = async () => {
     const v = input.value.trim();
     if (!v) return;
@@ -1065,7 +1065,7 @@ function buildInlineGroupEdit(gid, currentName) {
   const input = document.createElement("input");
   input.value = currentName;
   const ok = document.createElement("button");
-  ok.className = "icon-btn small"; ok.textContent = "✓"; ok.title = "确定";
+  ok.className = "icon-btn small"; ok.textContent = "✓"; ok.title = "OK";
   const commit = async () => {
     const v = input.value.trim();
     if (!v) return;
@@ -1087,7 +1087,7 @@ function renderQuickMenu() {
   const menu = $("#quick-group-menu");
   menu.innerHTML = "";
   const head = document.createElement("div");
-  head.className = "qgm-head"; head.textContent = "分组";
+  head.className = "qgm-head"; head.textContent = "Groups";
   menu.append(head);
 
   const addRow = (gid, label, isAll) => {
@@ -1099,13 +1099,13 @@ function renderQuickMenu() {
     row.addEventListener("click", () => { state.quickActiveGroup = gid; renderQuick(); hideQuickMenu(); });
     if (!isAll) {
       const rn = document.createElement("button");
-      rn.className = "icon-btn small icon-edit"; rn.textContent = "✎"; rn.title = "重命名分组";
+      rn.className = "icon-btn small icon-edit"; rn.textContent = "✎"; rn.title = "Rename group";
       rn.addEventListener("click", (e) => {
         e.stopPropagation();
         row.replaceWith(buildInlineGroupEdit(gid, label)); // 行内重命名，不弹窗
       });
       const del = document.createElement("button");
-      del.className = "icon-btn small danger"; del.textContent = "✕"; del.title = "删除分组";
+      del.className = "icon-btn small danger"; del.textContent = "✕"; del.title = "Delete group";
       del.addEventListener("click", async (e) => {
         e.stopPropagation();
         await api(`/api/quick/groups/${gid}`, { method: "DELETE" });
@@ -1118,7 +1118,7 @@ function renderQuickMenu() {
     menu.append(row);
   };
 
-  addRow(null, "默认分组", true);
+  addRow(null, "Default Group", true);
   for (const g of state.quickGroups) addRow(g.id, g.name, false);
 
   const foot = document.createElement("div");
@@ -1152,7 +1152,7 @@ function toggleQuickGroupMenu() {
 }
 
 function runQuickCommand(cmd) {
-  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return toast("没有活动的终端连接");
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return toast("No active terminal");
   // 只回显到终端：命令本身带换行符才执行；否则用户可编辑后回车
   state.ws.send(JSON.stringify({ type: "input", data: (cmd.command || "") }));
   // 焦点还给终端：否则回车会再次触发快捷命令按钮（重复输入）
@@ -1167,9 +1167,9 @@ async function moveQuickCmd(cid, newGroupId) {
 let editingQuickCmdId = null;
 function openQuickCmdModal(cmd) {
   editingQuickCmdId = cmd ? cmd.id : null;
-  $("#qc-title").textContent = cmd ? "编辑命令" : "新建命令";
+  $("#qc-title").textContent = cmd ? "Edit Command" : "New Command";
   const sel = $("#qc-group");
-  sel.innerHTML = '<option value="">默认分组</option>';
+  sel.innerHTML = '<option value="">Default Group</option>';
   for (const g of state.quickGroups) {
     const o = document.createElement("option");
     o.value = g.id; o.textContent = g.name;
@@ -1184,7 +1184,7 @@ function openQuickCmdModal(cmd) {
 async function submitQuickCmd() {
   const name = $("#qc-name").value.trim();
   const command = $("#qc-command").value.trim();
-  if (!name || !command) return toast("名称和命令不能为空");
+  if (!name || !command) return toast("Name and command required");
   const body = { name, command, group_id: $("#qc-group").value || null };
   if (editingQuickCmdId) await api(`/api/quick/commands/${editingQuickCmdId}`, { method: "PATCH", body });
   else await api("/api/quick/commands", { method: "POST", body });
@@ -1325,14 +1325,14 @@ function fmtSize(n) {
 async function loadSftp() {
   if (!state.sftpSid) return;
   const list = $("#sftp-list");
-  list.innerHTML = '<div class="sftp-loading">加载中…</div>';
+  list.innerHTML = '<div class="sftp-loading">Loading…</div>';
   $("#sftp-path").value = state.sftpPath;
   let entries = [];
   try {
     entries = await api(`/api/sessions/${state.sftpSid}/sftp/ls?path=${encodeURIComponent(state.sftpPath)}`);
-  } catch (e) { list.innerHTML = `<div class="sftp-empty">加载失败：${e.message}</div>`; return; }
+  } catch (e) { list.innerHTML = `<div class="sftp-empty">Load failed: ${e.message}</div>`; return; }
   list.innerHTML = "";
-  if (!entries.length) { list.innerHTML = '<div class="sftp-empty">（空目录）</div>'; return; }
+  if (!entries.length) { list.innerHTML = '<div class="sftp-empty">(empty)</div>'; return; }
   for (const e of entries) {
     const row = document.createElement("div");
     row.className = "sftp-item" + (e.is_dir ? " dir" : "");
@@ -1365,15 +1365,15 @@ async function uploadSftp(file) {
   fd.append("file", file);
   fd.append("target_dir", state.sftpPath);
   const resp = await fetch(`/api/sessions/${state.sftpSid}/sftp/upload`, { method: "POST", body: fd });
-  if (!resp.ok) { const d = await resp.json().catch(() => ({})); toast("上传失败：" + (d.detail || resp.status)); return; }
+  if (!resp.ok) { const d = await resp.json().catch(() => ({})); toast("Upload failed: " + (d.detail || resp.status)); return; }
   await loadSftp();
 }
 
 function showFileMenu(e, path) {
   const name = path.split("/").pop();
   showCtx(e.clientX, e.clientY, [
-    { label: "下载", onSelect: () => downloadSftp(path) },
-    { label: "编辑", onSelect: () => editSftpFile(path, name) },
+    { label: "Download", onSelect: () => downloadSftp(path) },
+    { label: "Edit", onSelect: () => editSftpFile(path, name) },
   ]);
 }
 
@@ -1386,7 +1386,7 @@ async function editSftpFile(path, name) {
     $("#fe-path").textContent = path;
     $("#fe-text").value = text;
     openModal($("#modal-file-edit"));
-  } catch (err) { toast("读取失败：" + err.message); }
+  } catch (err) { toast("Read failed: " + err.message); }
 }
 
 async function saveSftpFile() {
@@ -1399,7 +1399,7 @@ async function saveSftpFile() {
   fd.append("file", blob, name);
   fd.append("target_dir", dir);
   const resp = await fetch(`/api/sessions/${state.sftpSid}/sftp/upload`, { method: "POST", body: fd });
-  if (!resp.ok) { const d = await resp.json().catch(() => ({})); toast("保存失败：" + (d.detail || resp.status)); return; }
+  if (!resp.ok) { const d = await resp.json().catch(() => ({})); toast("Save failed: " + (d.detail || resp.status)); return; }
   closeModal($("#modal-file-edit"));
   await loadSftp();
 }
@@ -1409,17 +1409,17 @@ async function sftpSearch() {
   if (!state.sftpSid) return;
   if (!q) { loadSftp(); return; }
   const list = $("#sftp-list");
-  list.innerHTML = '<div class="sftp-loading">搜索中…</div>';
+  list.innerHTML = '<div class="sftp-loading">Searching…</div>';
   let r;
   try {
     // ftype=all：文件和目录都搜；条目带 is_dir
     r = await api(`/api/sessions/${state.sftpSid}/find`, { method: "POST", body: { path: state.sftpPath, pattern: q, ftype: "all" } });
-  } catch (err) { list.innerHTML = `<div class="sftp-empty">搜索失败：${err.message}</div>`; return; }
+  } catch (err) { list.innerHTML = `<div class="sftp-empty">Search failed: ${err.message}</div>`; return; }
   list.innerHTML = "";
   const entries = (r.entries && r.entries.length)
     ? r.entries
     : (r.results || []).map((p) => ({ path: p, is_dir: false }));
-  if (!entries.length) { list.innerHTML = '<div class="sftp-empty">（无匹配）</div>'; return; }
+  if (!entries.length) { list.innerHTML = '<div class="sftp-empty">(no match)</div>'; return; }
   for (const en of entries) {
     const p = en.path;
     const row = document.createElement("div");
@@ -1452,7 +1452,7 @@ $("#filter").addEventListener("input", () => {
 
 $("#btn-new").addEventListener("click", openNewModal);
 $("#empty-new").addEventListener("click", openNewModal);
-$("#btn-add-group").addEventListener("click", () => promptModal("新建分组", "", (v) => createGroup(v)));
+$("#btn-add-group").addEventListener("click", () => promptModal("New group", "", (v) => createGroup(v)));
 $("#quick-group-btn").addEventListener("click", toggleQuickGroupMenu);
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#quick-group-menu") && !e.target.closest("#quick-group-btn")) hideQuickMenu();
@@ -1486,7 +1486,7 @@ $("#qc-ok").addEventListener("click", submitQuickCmd);
 $("#qc-command").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitQuickCmd(); });
 $("#tab-sftp").addEventListener("click", () => {
   const sid = activeSid();
-  if (!sid) return toast("请先打开一个终端会话");
+  if (!sid) return toast("Open a terminal first");
   // 重复点击切换 SFTP 侧栏开关
   if ($("#sftp-panel").classList.contains("hidden")) openSftp(sid);
   else closeSftp();
@@ -1530,7 +1530,7 @@ $("#exp-sessions-all").addEventListener("click", () => toggleAllExport("#exp-ses
 $("#btn-import").addEventListener("click", openImportModal);
 $("#i-clipboard").addEventListener("click", async () => {
   let text;
-  try { text = await navigator.clipboard.readText(); } catch (_) { return toast("无法读取剪贴板（浏览器权限限制）"); }
+  try { text = await navigator.clipboard.readText(); } catch (_) { return toast("Cannot read clipboard (browser permission)"); }
   loadImportText(text);
 });
 $("#i-file").addEventListener("click", () => $("#i-file-input").click());

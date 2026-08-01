@@ -17,22 +17,20 @@
         <span class="brand-name">sshManager</span>
       </div>
       <nav class="topnav-items">
-        <button class="topnav-item active">会话</button>
+        <button class="topnav-item active">Sessions</button>
       </nav>
     </header>
-    <!-- 全宽操作栏（横跨整个屏幕，不局限于左侧列表） -->
     <div class="actionbar">
-      <button id="btn-import" class="btn ghost">导入</button>
-      <button id="btn-export" class="btn ghost">导出</button>
-      <button id="btn-bg" class="btn ghost bg-toggle" title="后台保活 SSH 连接">◔ 后台连接 <span id="bg-count">0</span></button>
+      <button id="btn-import" class="btn ghost">Import</button>
+      <button id="btn-export" class="btn ghost">Export</button>
+      <button id="btn-bg" class="btn ghost bg-toggle" title="Background SSH connections">◔ Background <span id="bg-count">0</span></button>
     </div>
     <div id="body">
-      <!-- 左侧会话面板 -->
       <aside id="panel">
         <div class="panel-search">
-          <input id="filter" type="text" placeholder="搜索名称 / IP…">
-          <button id="btn-new" class="quick-btn" title="新建会话"><span class="plus">＋</span>会话</button>
-          <button id="btn-add-group" class="quick-btn" title="新建分组"><span class="plus">＋</span>分组</button>
+          <input id="filter" type="text" placeholder="Search name / IP…">
+          <button id="btn-new" class="quick-btn" title="New session"><span class="plus">＋</span>Session</button>
+          <button id="btn-add-group" class="quick-btn" title="New group"><span class="plus">＋</span>Group</button>
         </div>
         <nav id="tree" class="tree"></nav>
       </aside>
@@ -41,7 +39,7 @@
       <main id="main">
         <div id="tabbar">
           <div id="tabs" class="tabs"></div>
-          <button id="tab-sftp" class="icon-btn tab-sftp" title="SFTP 文件（当前会话）">
+          <button id="tab-sftp" class="icon-btn tab-sftp" title="SFTP files (current session)">
             <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
               <path d="M1.5 4a1 1 0 0 1 1-1h3.1l1.5 1.5h7.4a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z"/>
             </svg>
@@ -54,28 +52,28 @@
             </div>
             <div id="empty-state">
               <div class="empty-glyph">⎇</div>
-              <p>在左侧选择一个会话，打开终端</p>
-              <button id="empty-new" class="btn primary">＋ 新建会话</button>
+              <p>Select a session to open a terminal</p>
+              <button id="empty-new" class="btn primary">+ New Session</button>
             </div>
           </div>
           <!-- SFTP 文件面板 -->
           <aside id="sftp-panel" class="hidden">
             <div class="sftp-head">
               <span class="sftp-title">SFTP · <span id="sftp-name"></span></span>
-              <button id="sftp-close" class="icon-btn" title="关闭">✕</button>
+              <button id="sftp-close" class="icon-btn" title="Close">✕</button>
             </div>
             <div class="sftp-pathbar">
               <input id="sftp-path" value="." spellcheck="false">
-              <button id="sftp-go" class="btn small" title="前往">前往</button>
-              <button id="sftp-up" class="btn small" title="上级目录">↑</button>
+              <button id="sftp-go" class="btn small" title="Go">Go</button>
+              <button id="sftp-up" class="btn small" title="Parent">↑</button>
             </div>
             <div class="sftp-searchbar">
-              <input id="sftp-search" placeholder="递归搜索文件…" spellcheck="false">
-              <button id="sftp-search-btn" class="btn small" title="递归搜索当前目录">搜索</button>
+              <input id="sftp-search" placeholder="Recursive search…" spellcheck="false">
+              <button id="sftp-search-btn" class="btn small" title="Recursive search">Search</button>
             </div>
             <div id="sftp-list" class="sftp-list"></div>
             <div class="sftp-actions">
-              <button id="sftp-upload" class="btn small">上传文件</button>
+              <button id="sftp-upload" class="btn small">Upload</button>
               <input type="file" id="sftp-file-input" class="hidden">
             </div>
           </aside>
@@ -84,7 +82,7 @@
         <section id="quickbar">
           <div class="quickbar-inner">
             <div class="quick-left">
-              <button id="quick-group-btn" class="quick-group-btn">默认分组 ▾</button>
+              <button id="quick-group-btn" class="quick-group-btn">Default Group ▾</button>
             </div>
             <div class="quick-right">
               <div id="quick-cmds" class="quick-cmds"></div>
@@ -101,8 +99,8 @@
       <h3 id="mp-title"></h3>
       <input id="mp-input" autocomplete="off">
       <div class="modal-actions">
-        <button class="btn ghost" data-close>取消</button>
-        <button id="mp-ok" class="btn primary">确定</button>
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="mp-ok" class="btn primary">OK</button>
       </div>
     </div>
   </div>
@@ -110,11 +108,11 @@
   <!-- 移动分组弹窗 -->
   <div id="modal-move" class="modal hidden">
     <div class="modal-box">
-      <h3>移动到分组</h3>
+      <h3>Move to Group</h3>
       <select id="mm-select"></select>
       <div class="modal-actions">
-        <button class="btn ghost" data-close>取消</button>
-        <button id="mm-ok" class="btn primary">移动</button>
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="mm-ok" class="btn primary">Move</button>
       </div>
     </div>
   </div>
@@ -122,38 +120,38 @@
   <!-- 新建会话 -->
   <div id="modal-new" class="modal hidden">
     <div class="modal-box">
-      <h3 id="n-title">新建会话</h3>
-      <label>名称 <input id="n-name" required placeholder="例如：生产服务器" autocomplete="off"></label>
-      <label>分组
+      <h3 id="n-title">New Session</h3>
+      <label>Name <input id="n-name" required placeholder="e.g. prod-server" autocomplete="off"></label>
+      <label>Group
         <select id="n-group">
-          <option value="">无分组</option>
+          <option value="">No Group</option>
         </select>
       </label>
-      <label>传输
+      <label>Transport
         <select id="n-transport">
-          <option value="ssh">SSH（远程）</option>
-          <option value="local">本地 Shell（开发验证）</option>
+          <option value="ssh">SSH (Remote)</option>
+          <option value="local">Local Shell (dev)</option>
         </select>
       </label>
       <div class="n-ssh">
         <div class="form-grid">
-          <label>主机 <input id="n-host" value="localhost" autocomplete="off"></label>
-          <label>端口 <input id="n-port" type="number" value="22"></label>
+          <label>Host <input id="n-host" value="localhost" autocomplete="off"></label>
+          <label>Port <input id="n-port" type="number" value="22"></label>
         </div>
-        <label>用户名 <input id="n-user" value="root" autocomplete="off"></label>
-        <label>认证
+        <label>Username <input id="n-user" value="root" autocomplete="off"></label>
+        <label>Auth
           <select id="n-auth">
-            <option value="password">密码</option>
-            <option value="key">SSH 密钥</option>
+            <option value="password">Password</option>
+            <option value="key">SSH Key</option>
           </select>
         </label>
-        <label id="n-password-wrap">密码 <input id="n-password" type="password" autocomplete="new-password"></label>
-        <label id="n-key-wrap" class="hidden">密钥路径 <input id="n-key" placeholder="~/.ssh/id_rsa" autocomplete="off"></label>
+        <label id="n-password-wrap">Password <input id="n-password" type="password" autocomplete="new-password"></label>
+        <label id="n-key-wrap" class="hidden">Key Path <input id="n-key" placeholder="~/.ssh/id_rsa" autocomplete="off"></label>
       </div>
-      <label>描述 <input id="n-desc" autocomplete="off"></label>
+      <label>Description <input id="n-desc" autocomplete="off"></label>
       <div class="modal-actions">
-        <button class="btn ghost" data-close>取消</button>
-        <button id="n-submit" class="btn primary">创建</button>
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="n-submit" class="btn primary">Create</button>
       </div>
     </div>
   </div>
@@ -161,19 +159,19 @@
   <!-- 导出会话/分组 -->
   <div id="modal-export" class="modal hidden">
     <div class="modal-box">
-      <h3>导出</h3>
+      <h3>Export</h3>
       <div class="exp-section">
-        <div class="exp-head"><span>分组</span><button id="exp-groups-all" class="link-btn">全选</button></div>
+        <div class="exp-head"><span>Groups</span><button id="exp-groups-all" class="link-btn">Select All</button></div>
         <div id="exp-groups" class="exp-list"></div>
       </div>
       <div class="exp-section">
-        <div class="exp-head"><span>会话</span><button id="exp-sessions-all" class="link-btn">全选</button></div>
+        <div class="exp-head"><span>Sessions</span><button id="exp-sessions-all" class="link-btn">Select All</button></div>
         <div id="exp-sessions" class="exp-list"></div>
       </div>
       <div class="modal-actions">
-        <button class="btn ghost" data-close>取消</button>
-        <button id="exp-clipboard" class="btn ghost">复制到剪贴板</button>
-        <button id="exp-file" class="btn primary">下载文件</button>
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="exp-clipboard" class="btn ghost">Copy to Clipboard</button>
+        <button id="exp-file" class="btn primary">Download File</button>
       </div>
     </div>
   </div>
@@ -181,15 +179,15 @@
   <!-- 快捷命令 -->
   <div id="modal-quick" class="modal hidden">
     <div class="modal-box">
-      <h3 id="qc-title">新建命令</h3>
-      <label>分组
+      <h3 id="qc-title">New Command</h3>
+      <label>Group
         <select id="qc-group"></select>
       </label>
-      <label>名称 <input id="qc-name" placeholder="例如：查看内存" autocomplete="off"></label>
-      <label>命令 <textarea id="qc-command" class="qc-cmd-input" placeholder="例如：free -h（末尾加换行则点击时直接执行）"></textarea></label>
+      <label>Name <input id="qc-name" placeholder="e.g. view memory" autocomplete="off"></label>
+      <label>Command <textarea id="qc-command" class="qc-cmd-input" placeholder="e.g. free -h (add a trailing newline to auto-run on click)"></textarea></label>
       <div class="modal-actions">
-        <button class="btn ghost" data-close>取消</button>
-        <button id="qc-ok" class="btn primary">确定</button>
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="qc-ok" class="btn primary">OK</button>
       </div>
     </div>
   </div>
@@ -197,27 +195,27 @@
   <!-- 导入 -->
   <div id="modal-import" class="modal hidden">
     <div class="modal-box">
-      <h3>导入</h3>
+      <h3>Import</h3>
       <div id="i-drop" class="drop-zone">
-        <p class="dz-hint">拖拽 JSON 文件到此处，或从以下来源读取</p>
+        <p class="dz-hint">Drop JSON file here, or load from:</p>
         <div class="dz-actions">
-          <button id="i-clipboard" class="btn ghost">从剪贴板读取</button>
-          <button id="i-file" class="btn ghost">选择文件</button>
+          <button id="i-clipboard" class="btn ghost">From Clipboard</button>
+          <button id="i-file" class="btn ghost">Choose File</button>
         </div>
       </div>
       <input type="file" id="i-file-input" class="hidden" accept=".json,application/json">
       <div id="i-preview" class="hidden">
         <div class="exp-section">
-          <div class="exp-head"><span>将导入的分组</span></div>
+          <div class="exp-head"><span>Groups to import</span></div>
           <div id="i-groups" class="exp-list"></div>
         </div>
         <div class="exp-section">
-          <div class="exp-head"><span>将导入的会话</span></div>
+          <div class="exp-head"><span>Sessions to import</span></div>
           <div id="i-sessions" class="exp-list"></div>
         </div>
         <div class="modal-actions">
-          <button id="i-cancel" class="btn ghost">取消</button>
-          <button id="i-confirm" class="btn primary">确定导入</button>
+          <button id="i-cancel" class="btn ghost">Cancel</button>
+          <button id="i-confirm" class="btn primary">Import</button>
         </div>
       </div>
     </div>
@@ -226,12 +224,12 @@
   <!-- 文件编辑 -->
   <div id="modal-file-edit" class="modal hidden">
     <div class="modal-box">
-      <h3>编辑文件 · <span id="fe-name"></span></h3>
+      <h3>Edit file · <span id="fe-name"></span></h3>
       <p class="hint" id="fe-path"></p>
       <textarea id="fe-text" spellcheck="false" class="fe-textarea"></textarea>
       <div class="modal-actions">
-        <button class="btn ghost" data-close>取消</button>
-        <button id="fe-save" class="btn primary">保存</button>
+        <button class="btn ghost" data-close>Cancel</button>
+        <button id="fe-save" class="btn primary">Save</button>
       </div>
     </div>
   </div>
@@ -293,7 +291,7 @@
 
   <!-- 后台连接面板 -->
   <div id="bg-panel" class="bg-panel hidden">
-    <div class="bg-panel-head">后台 SSH 连接</div>
+    <div class="bg-panel-head">Background SSH connections</div>
     <div id="bg-list"></div>
   </div>
 
