@@ -113,10 +113,13 @@ AI 流程：先 `GET /capabilities` 看能做什么 → `GET /capabilities/{name
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | WS | `/ws/terminal/{id}` | 终端流：input/resize（客户端→服务端）；buffer/output/status（服务端→客户端） |
-| POST | `/api/sessions/{id}/write` | AI 协同：写入共享终端 |
-| GET | `/api/sessions/{id}/buffer?since=` | AI 增量获取终端输出缓冲 |
+| POST | `/api/connections/{conn_id}/write` | AI 协同：写入指定连接（独立终端） |
+| GET | `/api/connections/{conn_id}/buffer?since=` | AI 增量获取指定连接输出缓冲 |
+| POST | `/api/connections/{conn_id}/disconnect` | 断开指定连接 |
 | POST | `/api/sessions/{id}/exec` | AI 独立：非交互执行命令 |
 | POST | `/api/sessions/{id}/find` | AI：递归搜索 |
+
+> 连接（conn_id）先通过 `POST /api/sessions/{id}/connect` 获取；每个 tab / 连接是独立终端通道，互不影响。
 
 ### SFTP
 

@@ -64,6 +64,10 @@ class Transport:
 
 ### 2.2 会话运行时（sessions.py）
 
+**连接模型**：一个会话配置（sid）可产生多个独立 `TerminalSession`（conn_id 唯一），
+每个连接有自己的 transport / pty / 缓冲 / 订阅者，互不影响。`SessionManager` 是连接池：
+`create(sid)` 新建连接、`get(conn_id)`、`remove(conn_id)`、`is_connected(sid)`、`disconnect_sid(sid)`。
+
 `TerminalSession` 关键成员：
 
 - **环形输出缓冲**：`_parts`（文本片段）、`_chars`（当前缓冲字符数）、`_total`（累计流字符数）、`_start`（缓冲首片流偏移）。
@@ -86,9 +90,11 @@ class Transport:
 ### 2.4 路由
 
 **terminal.py — WS 协议**：
+- 每个 ws 连接 = **一个独立终端连接**：`manager.create(sid)` → `connect()` → `await attach(ws)`（加入 readers + 发缓冲尾）→ `send status`（含 conn_id）。ws 关闭即 `manager.remove(conn_id)` 释放。
 - 客户端 → 服务端：`{"type":"input","data"}`、`{"type":"resize","cols","rows"}`。
-- 服务端 → 客户端：`{"type":"buffer","data"}`（历史尾）、`{"type":"output","data"}`、`{"type":"status","state"}`。
+- 服务端 → 客户端：`{"type":"status","state","conn_id"}`、`{"type":"buffer","data"}`（历史尾）、`{"type":"output","data"}`。
 - 连接失败（如 SSH 认证失败）→ 发 `status:error` 并 close(1011)。
+- ⚠️ `attach` 是 async，必须 `await`（漏写会导致 readers 未注册，ws 收不到后续消息）。
 
 **groups.py — 分组 CRUD**：`GET/POST/PATCH/DELETE /api/groups`；删除分组回落组内会话。
 

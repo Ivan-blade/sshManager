@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 开发进度快照（2026-08-01 手写记录，防上下文丢失）
 
-**已完成并验证**：后端全链路（会话/分组 CRUD、过滤、导入导出、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find、SFTP local、**AI 能力发现接口**）、前端（**Warp 风深色主题 + xshell 布局 + 分组树 + 多标签终端 + 右键菜单**，AI 面板已从界面移除）、Electron 壳、pytest 8/8 绿 + 浏览器 E2E 全过。
+**已完成并验证**：后端全链路（会话/分组 CRUD、过滤、导入导出、**独立连接模型**——每 tab 一个独立 pty/缓冲、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find、SFTP、**AI 能力发现接口**）、前端（**Warp 风深色主题 + xshell 布局 + 分组树 + 多标签终端 + 右键菜单**，双击会话=开新独立 tab，AI 面板已移除）、Electron 壳、pytest 9/9 绿 + 浏览器 E2E 全过。
 **当前运行态**：后端跑在 **127.0.0.1:8747**（`backend/.venv/bin/python run.py` 后台启动，日志 `/tmp/sshmgr_server.log`）；数据已清理，仅 1 个「本地开发机」演示会话。
 **未验证**：SSH 传输路径（asyncssh 已按 API 编码，但测试环境 `192.168.8.101` 无免密凭据，未真机实测）。
 **下一步候选方向**（用户待定）：① 接入 AI 模型（能力发现接口 `/api/ai/capabilities*` 已就绪，把 LLM 接到 exec/write/buffer）② 快捷命令分组 + 增删查改 + 导入导出 ③ SSH 真机联调 ④ AI 后台 WebSocket 长连接回显浏览器的「一起干」模式 ⑤ SFTP 前端 UI。
@@ -24,6 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **PATCH 无法置空字段**：`model_dump(exclude_none=True)` 会把显式 `null` 也丢掉 → 会话无法移出分组。用 `model_fields_set` 判断「未传」vs「显式置空」，显式 null 单独放行。
 - **前端分组树结构**：折叠要生效，children 必须是与行头**兄弟**的 `div.group-children`（CSS 用 `>` 或兄弟选择器），别把 children 嵌进行头里否则点击行头会误触子项。
 - **`document.querySelector` 会命中 `display:none` 元素**：E2E 判断可见性要用 `offsetParent === null` 而不是元素是否存在。
+- **async 调用漏 `await` 是隐蔽 bug**：`ts.attach(ws)` 忘写 await 时，协程永不执行——readers 没注册、buffer 不发、回显不扇出，表现为"ws 收不到任何后续消息"。排查时用假 reader（FakeWS + `await ts.attach`）隔离验证扇出层。
 
 ## 常用命令
 
