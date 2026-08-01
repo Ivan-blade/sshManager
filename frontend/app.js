@@ -1091,6 +1091,8 @@ function runQuickCommand(cmd) {
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return toast("没有活动的终端连接");
   // 只回显到终端：命令本身带换行符才执行；否则用户可编辑后回车
   state.ws.send(JSON.stringify({ type: "input", data: (cmd.command || "") }));
+  // 焦点还给终端：否则回车会再次触发快捷命令按钮（重复输入）
+  if (state.term) state.term.focus();
 }
 
 let editingQuickCmdId = null;
