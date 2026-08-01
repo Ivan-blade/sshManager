@@ -141,12 +141,28 @@
   <div id="modal-import" class="modal hidden">
     <div class="modal-box">
       <h3>导入</h3>
-      <p class="hint">支持 <code>{groups, sessions}</code> 格式。</p>
-      <div class="import-actions">
-        <button id="i-clipboard" class="btn primary">从剪贴板导入</button>
-        <button id="i-file" class="btn ghost">从文件导入</button>
+      <div id="i-drop" class="drop-zone">
+        <p class="dz-hint">拖拽 JSON 文件到此处，或从以下来源读取</p>
+        <div class="dz-actions">
+          <button id="i-clipboard" class="btn ghost">从剪贴板读取</button>
+          <button id="i-file" class="btn ghost">选择文件</button>
+        </div>
       </div>
       <input type="file" id="i-file-input" class="hidden" accept=".json,application/json">
+      <div id="i-preview" class="hidden">
+        <div class="exp-section">
+          <div class="exp-head"><span>将导入的分组</span></div>
+          <div id="i-groups" class="exp-list"></div>
+        </div>
+        <div class="exp-section">
+          <div class="exp-head"><span>将导入的会话</span></div>
+          <div id="i-sessions" class="exp-list"></div>
+        </div>
+        <div class="modal-actions">
+          <button id="i-cancel" class="btn ghost">取消</button>
+          <button id="i-confirm" class="btn primary">确定导入</button>
+        </div>
+      </div>
     </div>
   </div>
 

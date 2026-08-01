@@ -772,29 +772,71 @@ async function doExport(mode) {
   closeModal($("#modal-export"));
 }
 
-// 导入：从剪贴板或文件，只支持 {groups, sessions}
-function openImportModal() { openModal($("#modal-import")); }
+// ---- 导入：拖拽/选择/剪贴板 → 预览列表 → 确定导入（不弹提示）----
+let importData = null;
 
-async function importFromClipboard() {
-  let text;
-  try { text = await navigator.clipboard.readText(); }
-  catch (_) { return toast("无法读取剪贴板（浏览器权限限制）"); }
-  await doImportText(text);
+function openImportModal() {
+  importData = null;
+  $("#i-preview").classList.add("hidden");
+  $("#i-groups").innerHTML = "";
+  $("#i-sessions").innerHTML = "";
+  openModal($("#modal-import"));
 }
 
-async function importFromFile(file) {
-  await doImportText(await file.text());
-}
-
-async function doImportText(text) {
-  if (!text || !text.trim()) return toast("内容为空");
+function parseImport(text) {
+  if (!text || !text.trim()) return { error: "内容为空" };
   let data;
-  try { data = JSON.parse(text); } catch (_) { return toast("JSON 解析失败"); }
-  if (!data || !Array.isArray(data.sessions)) return toast("格式不正确：应为 {groups, sessions}");
-  const res = await api("/api/import", { method: "POST", body: { groups: data.groups || [], sessions: data.sessions } });
-  toast(`导入完成：会话 +${res.added}（跳过 ${res.skipped}），分组 +${res.groups_added}`);
+  try { data = JSON.parse(text); } catch (_) { return { error: "JSON 解析失败" }; }
+  if (!data || !Array.isArray(data.sessions)) return { error: "格式不正确：应为 {groups, sessions}" };
+  return { data: { groups: data.groups || [], sessions: data.sessions } };
+}
+
+function showImportPreview(data) {
+  importData = data;
+  const gbox = $("#i-groups");
+  gbox.innerHTML = "";
+  data.groups.forEach((g, i) => {
+    if (!g || !g.name) return;
+    const label = document.createElement("label");
+    label.className = "exp-item";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = i;
+    const nm = document.createElement("span"); nm.textContent = g.name;
+    label.append(cb, nm);
+    gbox.append(label);
+  });
+  const sbox = $("#i-sessions");
+  sbox.innerHTML = "";
+  data.sessions.forEach((s, i) => {
+    if (!s || !s.name) return;
+    const label = document.createElement("label");
+    label.className = "exp-item";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = i;
+    const nm = document.createElement("span"); nm.textContent = s.name;
+    const hs = document.createElement("span"); hs.className = "exp-host"; hs.textContent = s.host || s.transport || "";
+    label.append(cb, nm, hs);
+    sbox.append(label);
+  });
+  $("#i-preview").classList.remove("hidden");
+}
+
+function loadImportText(text) {
+  const r = parseImport(text);
+  if (r.error) { toast(r.error); return; }
+  showImportPreview(r.data);
+}
+
+async function confirmImport() {
+  if (!importData) return;
+  const groups = importData.groups.filter((_, i) =>
+    document.querySelector(`#i-groups input[data-idx="${i}"]`)?.checked !== false);
+  const sessions = importData.sessions.filter((_, i) =>
+    document.querySelector(`#i-sessions input[data-idx="${i}"]`)?.checked !== false);
+  await api("/api/import", { method: "POST", body: { groups, sessions } });
   closeModal($("#modal-import"));
   await loadAll();
+  // 不弹提示
 }
 
 // ==========================================================================
@@ -888,13 +930,27 @@ $("#exp-file").addEventListener("click", () => doExport("file"));
 $("#exp-groups-all").addEventListener("click", () => toggleAllExport("#exp-groups"));
 $("#exp-sessions-all").addEventListener("click", () => toggleAllExport("#exp-sessions"));
 $("#btn-import").addEventListener("click", openImportModal);
-$("#i-clipboard").addEventListener("click", importFromClipboard);
+$("#i-clipboard").addEventListener("click", async () => {
+  let text;
+  try { text = await navigator.clipboard.readText(); } catch (_) { return toast("无法读取剪贴板（浏览器权限限制）"); }
+  loadImportText(text);
+});
 $("#i-file").addEventListener("click", () => $("#i-file-input").click());
-$("#i-file-input").addEventListener("change", async (e) => {
+$("#i-file-input").addEventListener("change", (e) => {
   const f = e.target.files[0];
-  if (f) await importFromFile(f);
+  if (f) { const rd = new FileReader(); rd.onload = () => loadImportText(rd.result); rd.readAsText(f); }
   e.target.value = "";
 });
+$("#i-drop").addEventListener("dragover", (e) => { e.preventDefault(); $("#i-drop").classList.add("dragging"); });
+$("#i-drop").addEventListener("dragleave", () => $("#i-drop").classList.remove("dragging"));
+$("#i-drop").addEventListener("drop", (e) => {
+  e.preventDefault();
+  $("#i-drop").classList.remove("dragging");
+  const f = e.dataTransfer.files[0];
+  if (f) { const rd = new FileReader(); rd.onload = () => loadImportText(rd.result); rd.readAsText(f); }
+});
+$("#i-confirm").addEventListener("click", confirmImport);
+$("#i-cancel").addEventListener("click", () => closeModal($("#modal-import")));
 
 // 启动
 loadAll();
