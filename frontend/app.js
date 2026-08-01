@@ -226,11 +226,23 @@ function renderTabs() {
     const nm = document.createElement("span");
     nm.className = "tname";
     nm.textContent = t.name;
-    const close = document.createElement("span");
-    close.className = "t-close";
+
+    // 两个关闭按钮：✕ 仅关闭页面（SSH 保活）；⏻ 断开 SSH 并关闭
+    const actions = document.createElement("span");
+    actions.className = "t-actions";
+    const close = document.createElement("button");
+    close.className = "t-btn t-close";
+    close.title = "仅关闭页面（SSH 后台保活）";
     close.textContent = "✕";
-    close.addEventListener("click", (e) => { e.stopPropagation(); showCloseMenu(e, t.key); });
-    el.append(dot, nm, close);
+    close.addEventListener("click", (e) => { e.stopPropagation(); closeTab(t.key); });
+    const power = document.createElement("button");
+    power.className = "t-btn t-power";
+    power.title = "断开 SSH 并关闭";
+    power.textContent = "⏻";
+    power.addEventListener("click", (e) => { e.stopPropagation(); closeWithDisconnect(t.key); });
+    actions.append(close, power);
+
+    el.append(dot, nm, actions);
     el.addEventListener("click", () => activateTab(t.key));
     box.append(el);
   }
@@ -280,6 +292,7 @@ function closeTab(key) {
   }
   renderTabs();
   renderTree();
+  refreshStatuses(); // 关闭后刷新后台保活标记
 }
 
 function teardownTerminal() {
@@ -397,14 +410,6 @@ function showCtx(x, y, items) {
 }
 
 function hideCtx() { ctxEl.classList.add("hidden"); }
-
-// tab 关闭菜单：断开并关闭 / 仅关闭页面（SSH 后台保活）
-function showCloseMenu(e, key) {
-  showCtx(e.clientX, e.clientY, [
-    { label: "断开连接并关闭", onSelect: () => closeWithDisconnect(key) },
-    { label: "仅关闭页面（SSH 后台保活）", onSelect: () => { closeTab(key); refreshStatuses(); } },
-  ]);
-}
 
 async function closeWithDisconnect(key) {
   const tab = state.tabs.find((t) => t.key === key);

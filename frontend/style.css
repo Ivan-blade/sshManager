@@ -270,16 +270,23 @@ body {
   height: 2px; border-radius: 2px;
   background: linear-gradient(90deg, var(--accent), var(--accent-strong));
 }
-.tab .tname { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
-.tab .t-close {
-  width: 16px; height: 16px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 4px; font-size: 12px; line-height: 1;
-  color: var(--text-faint); opacity: 0;
-  transition: opacity var(--transition), background var(--transition), color var(--transition);
+.tab .tname { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.t-actions {
+  display: inline-flex; gap: 1px; align-items: center;
+  opacity: 0; transition: opacity var(--transition);
 }
-.tab:hover .t-close { opacity: 1; }
-.tab .t-close:hover { background: var(--border-strong); color: var(--danger); }
+.tab:hover .t-actions, .tab.active .t-actions { opacity: 1; }
+.t-btn {
+  width: 17px; height: 17px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 4px; padding: 0;
+  background: transparent; color: var(--text-faint);
+  font-size: 11px; line-height: 1; cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.t-btn:hover { background: var(--border-strong); }
+.t-close:hover { color: var(--warn); }
+.t-power:hover { color: var(--danger); }
 .tab-new { margin-left: 4px; }
 
 /* ---- 终端 ---- */
