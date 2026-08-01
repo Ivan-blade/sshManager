@@ -9,7 +9,8 @@ const state = {
   expanded: new Set(),
   statuses: {},      // sid -> "on" | "off" | "err"
   bg: {},            // sid -> 后台保活连接 conn_id 数组
-  tabs: [],          // [{key, sid, name, connId, mode}] mode: "new"|"restore"
+  connLabels: {},    // conn_id -> 自定义 tab 标签（后台面板/恢复用）
+  tabs: [],          // [{key, sid, name, connId, mode, custom}] mode: "new"|"restore"
   tabKey: 0,         // tab 唯一 key 递增器
   selectedId: null,  // 列表选中（单击）
   activeKey: null,   // 当前激活 tab 的 key
@@ -249,6 +250,15 @@ function renderTabs() {
 
     el.append(dot, nm, actions);
     el.addEventListener("click", () => activateTab(t.key));
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      showCtx(e.clientX, e.clientY, [
+        { label: "重命名 Tab", action: "renameTab" },
+        { label: "断开连接并关闭", onSelect: () => closeWithDisconnect(t.key) },
+        { label: "仅关闭页面（SSH 后台保活）", onSelect: () => { closeTab(t.key); refreshStatuses(); } },
+      ]);
+      state.ctxTarget = { type: "tab", key: t.key };
+    });
     box.append(el);
   }
 }
@@ -267,7 +277,9 @@ function openTab(sid, connId, mode) {
   if (!s) return;
   state.tabKey += 1;
   const key = state.tabKey;
-  state.tabs.push({ key, sid, name: s.name, connId, mode });
+  const label = (connId && state.connLabels[connId]) || s.name;
+  const custom = !!(connId && state.connLabels[connId]);
+  state.tabs.push({ key, sid, name: label, connId, mode, custom });
   activateTab(key);
 }
 
@@ -370,7 +382,10 @@ function connectWs(key) {
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === "status" && msg.conn_id) tab.connId = msg.conn_id; // 记住 conn_id（断开/恢复用）
+    if (msg.type === "status" && msg.conn_id) {
+      tab.connId = msg.conn_id; // 记住 conn_id（断开/恢复用）
+      if (tab.custom && tab.name) state.connLabels[tab.connId] = tab.name; // 自定义标签关联到连接
+    }
     if (msg.type === "status" && msg.state === "error" && tab.connId) {
       // 连接已失效（如曾被断开）→ 退回新建连接
       tab.connId = null;
@@ -427,6 +442,7 @@ function hideCtx() { ctxEl.classList.add("hidden"); }
 async function closeWithDisconnect(key) {
   const tab = state.tabs.find((t) => t.key === key);
   if (tab && tab.connId) {
+    delete state.connLabels[tab.connId];
     try { await api(`/api/connections/${tab.connId}/disconnect`, { method: "POST" }); } catch (_) {}
   }
   closeTab(key);
@@ -439,6 +455,17 @@ async function runCtxAction(action) {
   hideCtx();
   if (!t) return;
   if (action === "open" && t.type === "session") openSession(t.id);
+  else if (action === "renameTab" && t.type === "tab") {
+    const tab = state.tabs.find((x) => x.key === t.key);
+    if (!tab) return;
+    promptModal("重命名 Tab", tab.name, (v) => {
+      if (!v) return;
+      tab.name = v;
+      tab.custom = true;
+      if (tab.connId) state.connLabels[tab.connId] = v; // 后台面板/恢复显示该标签
+      renderTabs();
+    });
+  }
   else if (action === "restoreBg" && t.type === "session") {
     const bg = state.bg[t.id] || [];
     if (bg.length) openTab(t.id, bg[0], "restore");
@@ -447,6 +474,7 @@ async function runCtxAction(action) {
   else if (action === "disconnectBg" && t.type === "session") {
     const bg = state.bg[t.id] || [];
     for (const conn of bg) {
+      delete state.connLabels[conn];
       try { await api(`/api/connections/${conn}/disconnect`, { method: "POST" }); } catch (_) {}
     }
     state.bg[t.id] = [];
@@ -669,7 +697,7 @@ async function renderBgPanel() {
     const info = document.createElement("span");
     info.className = "bg-info";
     const nm = document.createElement("span");
-    nm.className = "bg-name"; nm.textContent = c.name;
+    nm.className = "bg-name"; nm.textContent = state.connLabels[c.conn_id] || c.name;
     const hs = document.createElement("span");
     hs.className = "bg-host"; hs.textContent = c.host || c.transport || "";
     info.append(nm, hs);
