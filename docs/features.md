@@ -51,7 +51,8 @@
 - **关闭 tab 两个按钮**（hover tab 显示）：
   - `✕` **仅关闭页面**：关闭页面，SSH **后台保活**（进程不断、输出继续累积）。
   - `⏻` **断开 SSH 并关闭**：关闭页面 + 断开 SSH，后台清除。
-- **后台连接管理**：会话列表显示「后台运行」标记；右键可「恢复到后台连接」「断开后台连接」「以新连接打开」。
+- **状态胶囊**（统一）：会话列表每项显示统一状态胶囊——`运行中`（绿）/ `后台 ×N`（黄）/ `离线`（灰）。
+- **后台连接管理**：面板「◔ 后台连接」按钮 → 弹出列表列出**全部**后台保活 SSH（跨会话，含会话名+主机），每条可「恢复 / 断开」；会话右键也有「恢复到后台连接 / 断开后台连接 / 以新连接打开」。
 - 支持实时 I/O、窗口 resize（xterm fit + 服务端 pty resize）。
 - 关闭程序时后端 lifespan 终止所有连接。
 
@@ -116,6 +117,7 @@ AI 流程：先 `GET /capabilities` 看能做什么 → `GET /capabilities/{name
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | WS | `/ws/terminal/{id}` | 终端流：input/resize（客户端→服务端）；buffer/output/status（服务端→客户端） |
+| GET | `/api/connections/background` | 列出全部后台保活连接（跨会话，含会话名/主机） |
 | POST | `/api/connections/{conn_id}/write` | AI 协同：写入指定连接（独立终端） |
 | GET | `/api/connections/{conn_id}/buffer?since=` | AI 增量获取指定连接输出缓冲 |
 | POST | `/api/connections/{conn_id}/disconnect` | 断开指定连接 |

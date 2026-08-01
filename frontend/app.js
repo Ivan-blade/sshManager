@@ -138,9 +138,10 @@ function _sessionNode(s, style) {
     + (s.id === activeSid() ? " active" : s.id === state.selectedId ? " selected" : "");
   li.style.cssText = style;
   li.dataset.sid = s.id;
-  const dot = document.createElement("span");
-  dot.className = "dot";
-  dot.dataset.dot = s.id;
+  const st = document.createElement("span");
+  st.className = "sess-status off";
+  st.dataset.status = s.id;
+  st.innerHTML = '<span class="sdot"></span><span class="stext">离线</span>';
   const meta = document.createElement("span");
   meta.className = "sess-meta";
   const name = document.createElement("div");
@@ -152,11 +153,6 @@ function _sessionNode(s, style) {
     ? "local · 本地 Shell"
     : `${s.username}@${s.host}:${s.port}`;
   meta.append(name, host);
-
-  const badge = document.createElement("span");
-  badge.className = "sess-badge hidden";
-  badge.dataset.badge = s.id;
-  badge.textContent = "后台运行";
 
   li.addEventListener("click", () => selectSession(s.id));           // 单击选中
   li.addEventListener("dblclick", () => openSession(s.id));          // 双击：有后台则恢复，否则新建
@@ -182,7 +178,7 @@ function _sessionNode(s, style) {
     state.ctxTarget = { type: "session", id: s.id, name: s.name };
   });
 
-  li.append(dot, meta, badge);
+  li.append(st, meta);
   return li;
 }
 
@@ -191,22 +187,26 @@ function selectSession(id) {
   renderTree();
 }
 
-function setDot(sid, cls) {
+function setStatus(sid, cls, text) {
   state.statuses[sid] = cls;
-  const d = document.querySelector(`[data-dot="${sid}"]`);
-  if (d) d.className = "dot " + (cls === "on" ? "on" : cls === "err" ? "err" : "");
+  const el = document.querySelector(`[data-status="${sid}"]`);
+  if (!el) return;
+  el.className = "sess-status " + (cls === "on" ? "on" : cls === "bg" ? "bg" : "off");
+  const txt = el.querySelector(".stext");
+  if (txt) txt.textContent = text || (cls === "on" ? "运行中" : cls === "bg" ? "后台" : "离线");
 }
 
 async function refreshStatuses() {
   for (const s of state.sessions) {
     try {
       const st = await api(`/api/sessions/${s.id}/status`);
-      setDot(s.id, st.connected ? "on" : "off");
       state.bg[s.id] = st.background_conns || [];
-      const badge = document.querySelector(`[data-badge="${s.id}"]`);
-      if (badge) badge.classList.toggle("hidden", state.bg[s.id].length === 0);
-    } catch (_) { setDot(s.id, "err"); }
+      if (state.bg[s.id].length) setStatus(s.id, "bg", `后台 ×${state.bg[s.id].length}`);
+      else if (st.connected) setStatus(s.id, "on", "运行中");
+      else setStatus(s.id, "off", "离线");
+    } catch (_) { setStatus(s.id, "off", "离线"); }
   }
+  refreshBgCount();
 }
 
 // ==========================================================================
@@ -221,8 +221,9 @@ function renderTabs() {
     const dot = document.createElement("span");
     dot.className = "dot";
     dot.dataset.tdot = t.sid;
-    dot.style.cssText = "width:6px;height:6px;border-radius:50%;flex-shrink:0;background:" +
-      (state.statuses[t.sid] === "on" ? "var(--ok)" : state.statuses[t.sid] === "err" ? "var(--danger)" : "var(--text-faint)");
+    const _sc = state.statuses[t.sid];
+    const dotColor = _sc === "on" ? "var(--ok)" : _sc === "bg" ? "var(--warn)" : "var(--text-faint)";
+    dot.style.cssText = `width:6px;height:6px;border-radius:50%;flex-shrink:0;background:${dotColor}`;
     const nm = document.createElement("span");
     nm.className = "tname";
     nm.textContent = t.name;
@@ -369,15 +370,15 @@ function connectWs(key) {
     if (msg.type === "output" || msg.type === "buffer") state.term.write(msg.data || "");
     else if (msg.type === "status") {
       const on = msg.state === "connected";
-      setDot(id, on ? "on" : "err");
+      setStatus(id, on ? "on" : "off", on ? "运行中" : "离线");
       renderTabs();
     }
   };
   ws.onclose = () => {
-    if (activeSid() === id) { setDot(id, "off"); renderTabs(); }
+    if (activeSid() === id) renderTabs();
     refreshStatuses();
   };
-  ws.onerror = () => { if (activeSid() === id) setDot(id, "err"); };
+  ws.onerror = () => { if (activeSid() === id) setStatus(id, "off", "错误"); };
 }
 
 // ==========================================================================
@@ -630,6 +631,67 @@ async function importFromText(text) {
 }
 
 // ==========================================================================
+// 后台连接面板
+// ==========================================================================
+async function refreshBgCount() {
+  try {
+    const bg = await api("/api/connections/background");
+    $("#bg-count").textContent = bg.length;
+    if (!$("#bg-panel").classList.contains("hidden")) renderBgPanel();
+  } catch (_) {}
+}
+
+async function renderBgPanel() {
+  const list = $("#bg-list");
+  let bg = [];
+  try { bg = await api("/api/connections/background"); } catch (_) {}
+  $("#bg-count").textContent = bg.length;
+  list.innerHTML = "";
+  if (!bg.length) {
+    list.innerHTML = '<div class="bg-empty">没有后台连接</div>';
+    return;
+  }
+  for (const c of bg) {
+    const row = document.createElement("div");
+    row.className = "bg-item";
+    const info = document.createElement("span");
+    info.className = "bg-info";
+    const nm = document.createElement("span");
+    nm.className = "bg-name"; nm.textContent = c.name;
+    const hs = document.createElement("span");
+    hs.className = "bg-host"; hs.textContent = c.host || c.transport || "";
+    info.append(nm, hs);
+    const res = document.createElement("button");
+    res.className = "btn small"; res.textContent = "恢复";
+    res.addEventListener("click", () => { openTab(c.sid, c.conn_id, "restore"); hideBgPanel(); });
+    const disc = document.createElement("button");
+    disc.className = "btn small danger"; disc.textContent = "断开";
+    disc.addEventListener("click", async () => {
+      try { await api(`/api/connections/${c.conn_id}/disconnect`, { method: "POST" }); } catch (_) {}
+      await renderBgPanel();
+      refreshStatuses();
+    });
+    row.append(info, res, disc);
+    list.append(row);
+  }
+}
+
+function toggleBgPanel() {
+  const p = $("#bg-panel");
+  if (p.classList.contains("hidden")) {
+    p.classList.remove("hidden");
+    const r = $("#btn-bg").getBoundingClientRect();
+    p.style.left = Math.min(r.left, Math.max(8, window.innerWidth - 330)) + "px";
+    p.style.top = (r.bottom + 6) + "px";
+    renderBgPanel();
+  } else {
+    p.classList.add("hidden");
+  }
+}
+
+function hideBgPanel() { $("#bg-panel").classList.add("hidden"); }
+
+// ==========================================================================
 // 事件绑定
 // ==========================================================================
 let filterTimer = null;
@@ -645,6 +707,10 @@ $("#btn-new").addEventListener("click", openNewModal);
 $("#btn-new-tab").addEventListener("click", openNewModal);
 $("#empty-new").addEventListener("click", openNewModal);
 $("#btn-add-group").addEventListener("click", () => promptModal("新建分组", "", (v) => createGroup(v)));
+$("#btn-bg").addEventListener("click", (e) => { e.stopPropagation(); toggleBgPanel(); });
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#bg-panel") && !e.target.closest("#btn-bg")) hideBgPanel();
+});
 $("#n-transport").addEventListener("change", toggleNewFields);
 $("#n-auth").addEventListener("change", toggleAuth);
 $("#n-submit").addEventListener("click", submitNew);

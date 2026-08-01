@@ -53,6 +53,24 @@ def _require_session(store: SessionStore, sid: str):
 conn_router = APIRouter(prefix="/api/connections", tags=["ai-connection"])
 
 
+@conn_router.get("/background")
+def list_background_connections(manager: ManagerDep, store: StoreDep) -> list[dict]:
+    """列出全部后台保活连接（跨会话），含会话名/主机，供前台恢复管理。"""
+    out = []
+    for ts in manager.background_all():
+        cfg = store.get(ts.sid)
+        if cfg:
+            out.append({
+                "conn_id": ts.id,
+                "sid": ts.sid,
+                "name": cfg.get("name", ""),
+                "host": cfg.get("host", ""),
+                "port": cfg.get("port"),
+                "transport": cfg.get("transport", "ssh"),
+            })
+    return out
+
+
 @conn_router.post("/{conn_id}/write")
 async def conn_write(conn_id: str, body: TerminalInput, manager: ManagerDep) -> dict:
     """协同路径：向指定终端连接写入数据（AI 干涉），输出进入该连接缓冲并回显给其订阅者。"""

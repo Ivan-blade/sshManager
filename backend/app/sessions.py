@@ -186,6 +186,10 @@ class SessionManager:
         return [ts.id for ts in self._sessions.values()
                 if ts.sid == sid and ts.connected and not ts.readers]
 
+    def background_all(self) -> list[TerminalSession]:
+        """全部会话的后台保活连接（跨会话）。"""
+        return [ts for ts in self._sessions.values() if ts.connected and not ts.readers]
+
     async def disconnect_sid(self, sid: str) -> None:
         for ts in list(self._sessions.values()):
             if ts.sid == sid:
