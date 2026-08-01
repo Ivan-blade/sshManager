@@ -164,10 +164,11 @@ cd backend && .venv/bin/python -m pytest tests/ -v
 ## 6. 已知问题与待办
 
 ### 已知问题
-- SSH 传输路径未真机验证（无凭据环境）。
+- ~~SSH 传输路径未真机验证~~ → 已实测（192.168.8.101，connect/exec/find/SFTP/交互终端全通过）。
 - SFTP 无前端 UI（仅 API）。
 - 密码明文存储（生产化需加密）。
 - `known_hosts=None` 不校验主机密钥（与 xshell 一致，安全权衡）。
+- SSH 交互终端注入命令前需等登录横幅/提示符（启动时序，AI 写路径需空闲检测）。
 
 ### 待办
 - [ ] 接入 AI 模型（意图解析 → exec/write；输出理解 → 决策循环）——能力发现接口已就绪

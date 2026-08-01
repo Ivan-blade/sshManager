@@ -41,7 +41,7 @@ def import_sessions(body: ImportRequest, store: StoreDep) -> dict:
 
 @router.post("")
 def create_session(body: SessionCreate, store: StoreDep) -> dict:
-    return store.create(body.model_dump())
+    return _public(store.create(body.model_dump()))
 
 
 @router.get("/{sid}")
