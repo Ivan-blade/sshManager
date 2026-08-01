@@ -1384,7 +1384,16 @@ function showFileMenu(e, path) {
   showCtx(e.clientX, e.clientY, [
     { label: "Download", onSelect: () => downloadSftp(path) },
     { label: "Edit", onSelect: () => editSftpFile(path, name) },
+    { label: "Delete", onSelect: () => deleteSftp(path), danger: true },
   ]);
+}
+
+async function deleteSftp(path) {
+  if (!confirm(`Delete "${path}"?`)) return;
+  try {
+    await api(`/api/sessions/${state.sftpSid}/sftp/delete`, { method: "POST", body: { path } });
+  } catch (e) { return toast("Delete failed: " + e.message); }
+  await loadSftp();
 }
 
 async function editSftpFile(path, name) {

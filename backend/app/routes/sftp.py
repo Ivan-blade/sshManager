@@ -3,12 +3,14 @@
 每个操作使用独立传输（SSH 每次建连接；local 映射本机文件系统，便于开发验证）。
 """
 import os
+import shutil
 import stat
 from pathlib import Path
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from ..deps import get_store
 from ..store import SessionStore
@@ -18,6 +20,10 @@ router = APIRouter(prefix="/api/sessions/{sid}/sftp", tags=["sftp"])
 StoreDep = Annotated[SessionStore, Depends(get_store)]
 
 CHUNK = 65536
+
+
+class SftpDeleteRequest(BaseModel):
+    path: str
 
 
 def _require(store: SessionStore, sid: str) -> dict:
@@ -146,6 +152,38 @@ async def sftp_upload(sid: str, store: StoreDep,
         return {"ok": True, "path": dest, "size": attrs.size}
     except Exception as exc:
         raise HTTPException(502, f"sftp upload failed: {exc}")
+    finally:
+        sftp.exit()
+        await sftp.wait_closed()
+        await transport.close()
+
+
+@router.post("/delete")
+async def sftp_delete(sid: str, store: StoreDep, body: SftpDeleteRequest) -> dict:
+    """删除远端文件或目录（目录仅限空目录）。"""
+    cfg, transport = await _ssh_transport(store, sid)
+
+    if cfg["transport"] == "local":
+        p = Path(body.path).expanduser()
+        try:
+            if p.is_dir():
+                shutil.rmtree(p)
+            else:
+                p.unlink()
+        except OSError as exc:
+            raise HTTPException(502, f"delete failed: {exc}")
+        return {"ok": True, "path": body.path}
+
+    sftp = await transport.conn.start_sftp_client()  # type: ignore[attr-defined]
+    try:
+        attrs = await sftp.stat(body.path)
+        if stat.S_ISDIR(attrs.permissions):
+            await sftp.rmdir(body.path)
+        else:
+            await sftp.remove(body.path)
+        return {"ok": True, "path": body.path}
+    except Exception as exc:
+        raise HTTPException(502, f"sftp delete failed: {exc}")
     finally:
         sftp.exit()
         await sftp.wait_closed()
