@@ -196,7 +196,6 @@ function _sessionNode(s, style) {
   delBtn.textContent = "✕";
   delBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (!confirm(`删除会话「${s.name}」？`)) return;
     await api(`/api/sessions/${s.id}`, { method: "DELETE" });
     const tab = state.tabs.find((x) => x.sid === s.id);
     if (tab) closeTab(tab.key);
@@ -514,7 +513,6 @@ async function runCtxAction(action) {
     }
   });
   else if (action === "deleteSession" && t.type === "session") {
-    if (!confirm(`删除会话「${t.name}」？`)) return;
     await api(`/api/sessions/${t.id}`, { method: "DELETE" });
     const idx = state.tabs.findIndex((x) => x.id === t.id);
     if (idx >= 0) closeTab(t.id);
