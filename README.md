@@ -1,93 +1,85 @@
+<div align="center">
+
 # sshManager
 
-人机协作的 SSH 工具（xshell 增强版）——人和 AI 在同一个浏览器界面里协同操作终端。
+**AI-assisted SSH client — human & AI collaborate in one shared terminal**
 
-## 核心理念
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-- 人和 AI 各自有**独立执行策略**，共享同一个终端会话
-- 人通过界面操作；AI 默认**静默执行**，遇到问题再和人协作
-- **AI 干涉走纯后端**（pty 所有权在 Python 后端，AI 往共享 pty 写字节），不依赖前端 JS
-- AI 获取终端信息用 `getBuffer` **增量获取**，防止全量拉取占用上下文
+</div>
 
-## 架构
+An "enhanced xshell": human and AI work on the **same terminal session** from a browser or a desktop app. The AI can silently operate a connection in the background (run commands, search files, manage SFTP), or inject commands into a shared terminal that the human sees live.
 
-```
-前端: JS + xterm + pty ──打包──> Electron（启动时拉起 Python 后端）
-后端: Python FastAPI（持有 pty master，人和 AI 都是其客户端）
-AI:   双路径 —— 协同路径（驱动共享界面，有并发问题）/ 独立路径（纯后端，无并发）
-```
+## Features
 
-## 技术栈
+- **Session & group management** — filter by name/IP simultaneously, import/export (JSON file or clipboard), background keep-alive with one-click restore
+- **Multi-tab terminal** — each tab is an independent SSH connection; closing a tab keeps SSH running in the background
+- **Quick commands** — groups + commands CRUD, send to terminal (echo-only, or auto-run with a trailing newline), import/export
+- **SFTP panel** — browse / upload (drag & drop) / download / edit / delete / recursive search
+- **AI capability discovery** — `GET /api/ai/capabilities` lets an AI agent self-discover and call every backend capability
+- **AI dual-path execution** — independent (non-interactive `exec`/`find`, no concurrency) or collaborative (inject into a shared terminal the human sees)
+- **Incremental output buffer** — AI reads only *new* output via a `?since=` offset (saves context)
 
-| 层 | 技术 |
-|----|------|
-| 终端前端 | xterm.js |
-| 终端尺寸适配 | xterm-resize（@xterm/addon-fit） |
-| 桌面壳 | Electron |
-| 后端 | Python FastAPI |
-| 终端/pty | pty 由 Python 后端持有 |
+## Quick Start
 
-## 功能规划
-
-- 会话列表管理：按 **IP + 名称同时过滤**
-- 会话导入/导出：支持 **JSON 文件 + 剪贴板**
-- 快捷命令导入/导出：支持 **JSON 文件 + 剪贴板**
-- 快捷命令管理：分组 + 命令**增删查改** + 命令在组间**移动**
-- SFTP 管理：**复用 SSH 连接**，文件上传/下载/修改
-- 当前路径递归搜索：后端 Python 接口执行 `find` 实现
-
-## 运行
-
-### 方式一：Electron 桌面壳（启动时自动拉起 Python 后端）
+### Desktop (Electron)
 
 ```bash
 cd frontend && npm start
 ```
 
-### 方式二：浏览器开发模式
+### Browser
 
 ```bash
 cd backend && .venv/bin/python run.py
-# 打开 http://127.0.0.1:8747
+# → http://127.0.0.1:8747
 ```
 
-> 端口默认 **8747**（避开常用端口），可用环境变量覆盖：`SSHMANAGER_PORT=9000 .venv/bin/python run.py`
-
-首次运行需安装依赖：
+### Install dependencies
 
 ```bash
 python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
 cd frontend && npm install
 ```
 
-## 测试
+## Tech Stack
 
-```bash
-cd backend && .venv/bin/python -m pytest tests/ -v
-```
+| Layer      | Tech                                   |
+|------------|----------------------------------------|
+| Terminal   | xterm.js · @xterm/addon-fit            |
+| Desktop    | Electron                               |
+| Backend    | Python FastAPI · asyncssh              |
+| Storage    | JSON files (sessions / groups / quick) |
+| AI         | Capability discovery API (`/api/ai/capabilities*`) |
 
-冒烟测试聚焦 **local 传输**（与 SSH 共用同一套 exec / 交互通道 / buffer / find / SFTP 代码路径）；SSH 传输需有凭据的测试环境。
+## Architecture (summary)
 
-## 测试环境
+- **Python backend owns the pty** — the frontend and the AI are both clients of it.
+- **Connection model** — a session config can spawn multiple independent SSH connections (`conn_id`); each has its own pty + output buffer.
+- **AI interference goes through backend APIs, not frontend JS** — so the Electron shell can later be dropped for a pure-browser form.
+- **Background keep-alive** — closing a tab detaches, SSH stays alive and is restorable.
 
-```bash
-ssh root@192.168.8.101
-```
+See [docs/architecture.md](docs/architecture.md) for the full picture.
 
-（私有本地测试 IP，非生产）
+## Documentation
 
-## 状态与已知事项
+- [Usage Guide — Human & AI](docs/usage.md)
+- [Architecture](docs/architecture.md)
+- [Features](docs/features.md)
+- [Implementation](docs/implementation.md)
 
-- **已实现**：Warp 风 xshell 布局（左侧分组树 + 主区多标签终端 + 右键菜单）、会话/分组 CRUD/过滤/导入导出、终端 WebSocket 流（含增量 buffer）、AI 双路径（write / exec / find，**纯后端无界面**）、**AI 能力发现接口**（`/api/ai/capabilities*`）、SFTP（复用连接）、Electron 壳、冒烟测试。
-- **AI 接入**：AI 执行面无界面，AI agent 先 `GET /api/ai/capabilities` 自举了解能力，再 `GET /api/ai/capabilities/{name}` 查参数后调用。
-- **SSH 路径**：asyncssh 连接 + pty 交互已编码，且已在测试机 `192.168.8.101` 真机验证（connect/exec/find/SFTP/交互终端）。
-- **密码存储**：会话密码明文存于 `data/sessions.json`（与 xshell 同类工具一致）；生产化应加密。
+## Roadmap
 
-> 详细设计见 [CLAUDE.md](./CLAUDE.md)
+- [ ] Wire an LLM to the capability API (intent → commands, output → next step)
+- [ ] AI background WebSocket echo → "work together" mode
+- [ ] Drag-and-drop sorting for sessions / groups / commands
+- [ ] Encrypted credential storage
 
-## 文档
+## Tested Against
 
-- [使用指南](./docs/usage.md) —— 人怎么用 + AI 怎么调接口（含示例脚本）
-- [架构文档](./docs/architecture.md) —— 分层架构、关键设计决策、数据流、演进方向
-- [功能文档](./docs/features.md) —— 功能清单、使用方式、API 参考
-- [实现文档](./docs/implementation.md) —— 代码结构、模块实现细节、踩坑经验、待办
+- pytest 12/12 passing · browser E2E · Electron smoke test
+- Real SSH host (CentOS 7) — connect / exec / find / SFTP / interactive terminal all verified
+
+## License
+
+Private project. Contact the owner for licensing questions.
