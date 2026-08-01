@@ -1357,11 +1357,19 @@ async function loadSftp() {
       row.addEventListener("dblclick", () => { state.sftpPath = e.path; loadSftp(); });
     } else {
       row.addEventListener("dblclick", () => downloadSftp(e.path)); // 双击文件下载
-      row.addEventListener("contextmenu", (ev) => {
-        ev.preventDefault();
-        showFileMenu(ev, e.path);
-      });
     }
+    row.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation(); // 关键：阻止全局 contextmenu 处理器关掉刚弹出的菜单
+      if (e.is_dir) {
+        showCtx(ev.clientX, ev.clientY, [
+          { label: "Open", onSelect: () => { state.sftpPath = e.path; loadSftp(); } },
+          { label: "Delete", onSelect: () => deleteSftp(e.path), danger: true },
+        ]);
+      } else {
+        showFileMenu(ev, e.path);
+      }
+    });
     list.append(row);
   }
 }
@@ -1452,7 +1460,7 @@ async function sftpSearch() {
       else state.sftpPath = p.lastIndexOf("/") > 0 ? p.slice(0, p.lastIndexOf("/")) : "."; // 文件 → 父目录
       loadSftp();
     });
-    row.addEventListener("contextmenu", (ev) => { ev.preventDefault(); showFileMenu(ev, p); });
+    row.addEventListener("contextmenu", (ev) => { ev.preventDefault(); ev.stopPropagation(); showFileMenu(ev, p); });
     list.append(row);
   }
 }
