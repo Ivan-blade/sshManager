@@ -47,12 +47,12 @@ function renderTabs() {
 }
 
 function openSession(sid) {
-  // 双击：有后台保活连接则恢复到它，否则新建独立连接
+  // 双击：始终新建独立连接（恢复后台连接走 ◔ Background 面板 / 右键 Restore background）。
+  // 注意：非激活 tab 的连接无 ws reader，会被 status 当成后台连接——若双击去"恢复"会造成
+  // 同一个 SSH 出现在两个窗口。所以双击一律新建，不恢复。
   const s = sessionById(sid);
   if (!s) return;
-  const bg = state.bg[sid] || [];
-  if (bg.length) openTab(sid, bg[0], "restore", state.bgNames[bg[0]]);
-  else openTab(sid, null, "new");
+  openTab(sid, null, "new");
 }
 
 function openTab(sid, connId, mode, labelOverride) {
