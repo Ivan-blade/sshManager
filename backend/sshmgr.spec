@@ -21,7 +21,7 @@ FRONT   = os.path.join(ROOT, "frontend")
 # 前端静态资源（随二进制打进，只读；_MEIPASS/frontend 由 config.py 定位）
 datas = [
     (os.path.join(FRONT, "index.html"), "frontend"),
-    (os.path.join(FRONT, "app.js"),     "frontend"),
+    (os.path.join(FRONT, "js"),         "frontend/js"),
     (os.path.join(FRONT, "style.css"),  "frontend"),
     (os.path.join(FRONT, "vendor"),     "frontend/vendor"),
 ]
