@@ -73,3 +73,13 @@ class FindRequest(BaseModel):
     pattern: str = "*"
     max_depth: Optional[int] = Field(None, ge=1, le=100)
     ftype: Literal["f", "d", "all"] = "f"
+
+
+class ConnectRequest(BaseModel):
+    """创建连接时的可选显示标签；不传则显示所属会话名（UUID 仍是唯一标识）。"""
+    label: Optional[str] = Field(None, max_length=64)
+
+
+class LabelRequest(BaseModel):
+    """设置/清除连接的显示名；null 则回落到会话名。与界面 Rename Tab 共用 ts.label。"""
+    label: Optional[str] = Field(None, max_length=64)

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..capabilities import detail as capability_detail
 from ..capabilities import overview as capabilities_overview
 from ..deps import get_manager, get_store
-from ..models import ExecRequest, FindRequest, TerminalInput
+from ..models import ExecRequest, FindRequest, LabelRequest, TerminalInput
 from ..sessions import SessionManager
 from ..store import SessionStore
 from ..transports import build_transport
@@ -63,7 +63,7 @@ def list_background_connections(manager: ManagerDep, store: StoreDep) -> list[di
             out.append({
                 "conn_id": ts.id,
                 "sid": ts.sid,
-                "name": cfg.get("name", ""),
+                "name": ts.label or cfg.get("name", ""),  # 连接自定义名优先，否则用会话名
                 "host": cfg.get("host", ""),
                 "port": cfg.get("port"),
                 "transport": cfg.get("transport", "ssh"),
@@ -79,6 +79,16 @@ async def conn_write(conn_id: str, body: TerminalInput, manager: ManagerDep) -> 
         raise HTTPException(409, "connection not connected")
     await ts.write(body.data)
     return {"ok": True, "conn_id": conn_id, "written": len(body.data)}
+
+
+@conn_router.patch("/{conn_id}/label")
+async def conn_set_label(conn_id: str, body: LabelRequest, manager: ManagerDep) -> dict:
+    """设置/清除连接的显示名 label（null 回落会话名）。与 connect 的 label、界面 Rename Tab 共用同一字段。"""
+    ts = manager.get(conn_id)
+    if ts is None:
+        raise HTTPException(404, "connection not found")
+    ts.label = body.label
+    return {"ok": True, "conn_id": conn_id, "label": ts.label}
 
 
 @conn_router.get("/{conn_id}/status")

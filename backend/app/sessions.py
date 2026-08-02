@@ -26,10 +26,11 @@ class TerminalSession:
 
     MAX_BUF = config.TERMINAL_BUF_LIMIT
 
-    def __init__(self, conn_id: str, session_cfg: dict):
+    def __init__(self, conn_id: str, session_cfg: dict, label: Optional[str] = None):
         self.id = conn_id          # 连接唯一 id
         self.sid = session_cfg.get("id", "")
         self.cfg = session_cfg
+        self.label = label         # 可选显示名（默认用所属会话名）
         self.transport: Optional[Transport] = None
         self._channel = None
         self.connected = False
@@ -174,13 +175,13 @@ class SessionManager:
         self.store = store
         self._sessions: dict[str, TerminalSession] = {}  # conn_id -> TerminalSession
 
-    def create(self, sid: str) -> Optional[TerminalSession]:
-        """为会话配置创建一个新的独立连接。"""
+    def create(self, sid: str, label: Optional[str] = None) -> Optional[TerminalSession]:
+        """为会话配置创建一个新的独立连接。label 为可选的连接显示名。"""
         cfg = self.store.get(sid)
         if not cfg:
             return None
         conn_id = uuid.uuid4().hex
-        ts = TerminalSession(conn_id, cfg)
+        ts = TerminalSession(conn_id, cfg, label=label)
         self._sessions[conn_id] = ts
         return ts
 

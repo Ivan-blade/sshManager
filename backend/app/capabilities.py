@@ -12,9 +12,9 @@ AI 流程：
 """
 from typing import Optional
 
-from .models import (ExecRequest, FindRequest, GroupCreate, QuickCommandCreate,
-                     QuickCommandUpdate, QuickGroupCreate, SessionCreate,
-                     TerminalInput)
+from .models import (ConnectRequest, ExecRequest, FindRequest, GroupCreate,
+                     LabelRequest, QuickCommandCreate, QuickCommandUpdate,
+                     QuickGroupCreate, SessionCreate, TerminalInput)
 
 
 def _body_schema(model) -> dict:
@@ -80,8 +80,10 @@ CAPABILITIES: list[dict] = [
          '{"groups_added":n,"added":n,"skipped":n,"total":n}'),
     # ---- 连接控制 ----
     _cap("connect_session", "POST", "/api/sessions/{sid}/connect",
-         "为会话创建一个新的独立终端连接，返回 conn_id（后续 write/buffer 需要它）",
-         [SESSION_PATH], '{"ok":true,"conn_id":"...","state":"connected"}',
+         "为会话创建一个新的独立终端连接，返回 conn_id（后续 write/buffer 需要它）；body.label 可选：连接显示名覆盖（默认显示所属会话名）",
+         [SESSION_PATH, {"name": "body", "in": "body", "required": False,
+                         "schema": _body_schema(ConnectRequest)}],
+         '{"ok":true,"conn_id":"...","state":"connected"}',
          chain="产出 conn_id，供 write_terminal / read_buffer / connection_disconnect 使用。"),
     _cap("disconnect_session", "POST", "/api/sessions/{sid}/disconnect",
          "断开该会话的全部连接", [SESSION_PATH], '{"ok":true,"state":"disconnected"}'),
@@ -142,6 +144,12 @@ CAPABILITIES: list[dict] = [
          [{"name": "conn_id", "in": "path", "type": "string", "required": True, "description": "连接 ID"}],
          '{"conn_id":..,"connected":bool,"idle":bool,"idle_ms":n,"buffer_total":n}',
          chain="配合 write_terminal：写之前先查 idle=true（空闲）再注入，避免和正在运行的命令交错；写完用 read_buffer 增量取输出。"),
+    _cap("set_connection_label", "PATCH", "/api/connections/{conn_id}/label",
+         "设置/清除连接的显示名（null 回落会话名）；与界面 Rename Tab 共用同一 ts.label 字段",
+         [{"name": "conn_id", "in": "path", "type": "string", "required": True, "description": "连接 ID"},
+          {"name": "body", "in": "body", "required": True, "schema": _body_schema(LabelRequest)}],
+         '{"ok":true,"label":"..."}',
+         chain="连接显示名统一存 ts.label：connect_session 创建时可带 label，之后用本接口改；后台列表 name=label 或会话名。"),
     # ---- SFTP ----
     _cap("sftp_list", "GET", "/api/sessions/{sid}/sftp/ls",
          "列出远端目录（SSH 复用连接；local 为本机文件系统）",

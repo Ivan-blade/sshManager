@@ -360,6 +360,48 @@ def test_connection_status_idle_and_interactive_write(client, local_session):
     client.post(f"/api/connections/{conn}/disconnect")
 
 
+def test_connect_with_label(client, local_session):
+    """连接可指定显示名：connect 传 label → 后台连接列表用 label；不传 → 用会话名。"""
+    # 带 label 连接
+    r = client.post(f"/api/sessions/{local_session}/connect", json={"label": "我的自定义连接"})
+    assert r.status_code == 200
+    conn = r.json()["conn_id"]
+    bg = client.get("/api/connections/background").json()
+    row = next(x for x in bg if x["conn_id"] == conn)
+    assert row["name"] == "我的自定义连接" and row["sid"] == local_session
+
+    # 不带 label → 显示会话名
+    r2 = client.post(f"/api/sessions/{local_session}/connect")
+    assert r2.status_code == 200
+    conn2 = r2.json()["conn_id"]
+    bg2 = client.get("/api/connections/background").json()
+    row2 = next(x for x in bg2 if x["conn_id"] == conn2)
+    sess = client.get(f"/api/sessions/{local_session}").json()
+    assert row2["name"] == sess["name"]
+
+    client.post(f"/api/connections/{conn}/disconnect")
+    client.post(f"/api/connections/{conn2}/disconnect")
+
+
+def test_connection_label_patch(client, local_session):
+    """PATCH 连接 label：改显示名；null 回落会话名；不存在 404。"""
+    conn = client.post(f"/api/sessions/{local_session}/connect").json()["conn_id"]
+    sess_name = client.get(f"/api/sessions/{local_session}").json()["name"]
+
+    r = client.patch(f"/api/connections/{conn}/label", json={"label": "改过名"})
+    assert r.status_code == 200 and r.json()["label"] == "改过名"
+    row = next(x for x in client.get("/api/connections/background").json() if x["conn_id"] == conn)
+    assert row["name"] == "改过名"
+
+    r2 = client.patch(f"/api/connections/{conn}/label", json={"label": None})
+    assert r2.status_code == 200
+    row2 = next(x for x in client.get("/api/connections/background").json() if x["conn_id"] == conn)
+    assert row2["name"] == sess_name
+
+    assert client.patch("/api/connections/nope/label", json={"label": "x"}).status_code == 404
+    client.post(f"/api/connections/{conn}/disconnect")
+
+
 def test_sftp_local(client, local_session):
     target = tempfile.mkdtemp()
     payload = b"sftp-test-content"
