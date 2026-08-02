@@ -79,6 +79,22 @@ cd frontend && npm install
 - [功能文档](docs/features.md)
 - [实现文档](docs/implementation.md)
 
+## 分支
+
+- **`main`** — 开发主线。核心功能（会话 / 终端 / AI / SFTP / Electron）都在这里；`npm start`、`python run.py` 直接可用。
+- **`feat/packaging`** — 打包分发（PyInstaller 冻结后端 + electron-builder）。要出 macOS `.app` / `.dmg`，切到这个分支构建：
+
+  ```bash
+  git checkout feat/packaging
+  cd backend && .venv/bin/pip install "pyinstaller>=6.21"
+  cd ../frontend && npm install
+  npm run package:backend && CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac
+  ```
+
+  构建产物（`frontend/dist/*.dmg`、`*.app`）已 gitignore，不入库。
+
+  打包分支暂未合并回 `main`；验证成熟后 `git checkout main && git merge feat/packaging`。
+
 ## 路线图
 
 - [ ] AI 后台 WebSocket 回显 →「一起干」模式

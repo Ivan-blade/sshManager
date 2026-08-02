@@ -79,6 +79,22 @@ See [docs/architecture.md](docs/architecture.md) for the full picture.
 - [Features](docs/features.md)
 - [Implementation](docs/implementation.md)
 
+## Branches
+
+- **`main`** — development trunk. All core features (sessions / terminal / AI / SFTP / Electron) live here; `npm start` and `python run.py` work as-is.
+- **`feat/packaging`** — distributable packaging (PyInstaller backend freeze + electron-builder). Check out this branch to build a macOS `.app` / `.dmg`:
+
+  ```bash
+  git checkout feat/packaging
+  cd backend && .venv/bin/pip install "pyinstaller>=6.21"
+  cd ../frontend && npm install
+  npm run package:backend && CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac
+  ```
+
+  Build output (`frontend/dist/*.dmg`, `*.app`) is gitignored — the distributable is never committed to the repo.
+
+  Packaging is not merged to `main` yet; merge it once proven: `git checkout main && git merge feat/packaging`.
+
 ## Roadmap
 
 - [ ] AI background WebSocket echo → "work together" mode
