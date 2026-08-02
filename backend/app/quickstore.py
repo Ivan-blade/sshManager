@@ -70,6 +70,10 @@ class QuickStore:
             return True
 
     # ---------------- 命令 ----------------
+    def get_command(self, cid: str) -> Optional[dict]:
+        with self._lock:
+            return self._commands.get(cid)
+
     def list_commands(self) -> list[dict]:
         with self._lock:
             return sorted(self._commands.values(),

@@ -22,6 +22,7 @@
 | **AI 能力发现**（概述 + 按接口查参数） | ✅ 已实现 | `GET /api/ai/capabilities*` |
 | SFTP 文件浏览 / 上传 / 下载 / 编辑 / 删除 / 递归搜索 | ✅ 已实现 | SFTP 面板 + REST API |
 | 快捷命令分组 + 增删查改 + 组间移动 + 导入导出 | ✅ 已实现 | 快捷命令栏 + Q-Export/Q-Import |
+| 快捷命令触发（exec 独立 / write 协同，AI 可调） | ✅ 已实现 | `POST /api/quick/commands/{cid}/run` |
 | AI 后台 WS 长连接回显浏览器（「一起干」） | 🔲 规划中 | — |
 | SSH 真机联调验证 | ✅ 已通过（192.168.8.101 实测） | — |
 

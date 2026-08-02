@@ -14,7 +14,8 @@ from typing import Optional
 
 from .models import (ConnectRequest, ExecRequest, FindRequest, GroupCreate,
                      LabelRequest, QuickCommandCreate, QuickCommandUpdate,
-                     QuickGroupCreate, SessionCreate, TerminalInput)
+                     QuickGroupCreate, QuickRunRequest, SessionCreate,
+                     TerminalInput)
 
 
 def _body_schema(model) -> dict:
@@ -207,6 +208,12 @@ CAPABILITIES: list[dict] = [
          "删除快捷命令",
          [{"name": "cid", "in": "path", "type": "string", "required": True, "description": "命令 ID"}],
          '{"ok":true}'),
+    _cap("run_quick_command", "POST", "/api/quick/commands/{cid}/run",
+         "触发快捷命令：exec=独立非交互执行返回结果（默认）；write=发送到共享终端（协同，可传 conn_id 指定连接）",
+         [{"name": "cid", "in": "path", "type": "string", "required": True, "description": "命令 ID"},
+          {"name": "body", "in": "body", "required": True, "schema": _body_schema(QuickRunRequest)}],
+         'exec: {ok,mode,stdout,stderr,exit_code,...} | write: {ok,mode,conn_id,sent}',
+         chain="一步触发：查命令文本并执行/发送。exec 走独立路径；write 走协同路径（见 connect_session/write_terminal）。"),
     _cap("quick_export", "POST", "/api/quick/export",
          "按选择导出快捷命令分组与命令（空选择=全部）",
          [{"name": "body", "in": "body", "required": True,

@@ -110,6 +110,8 @@ class Transport:
 
 **groups.py — 分组 CRUD**：`GET/POST/PATCH/DELETE /api/groups`；删除分组回落组内会话。
 
+**quick.py — 快捷命令**：分组 + 命令 CRUD、导入导出；`POST /commands/{cid}/run` 触发执行——`exec` 独立非交互返回结果，`write` 发送到共享终端（可传 `conn_id` 指定连接）。
+
 **ai.py — AI 双路径（交互/非交互）+ 能力发现**：
 - **独立路径（非交互，默认优先）**：`POST /exec`——`build_transport(cfg)` 新建连接执行，返回 `{stdout, stderr, exit_code, duration_ms, timed_out}`；`POST /find`——参数经 `shlex.quote` 安全引用后组 find 命令。
 - **协同路径（交互）**：`POST /api/connections/{conn_id}/write`——向共享终端注入（处理需 TTY 的交互命令）；`GET /api/connections/{conn_id}/buffer?since=`——增量读取；`GET /api/connections/{conn_id}/status`——**空闲检测**（`idle/idle_ms`，注入前确认提示符就绪）；`PATCH /api/connections/{conn_id}/label`——连接显示名（`connect_session` 创建时可带 label，界面 Rename Tab 也走这里，统一存 `ts.label`）。

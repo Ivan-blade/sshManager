@@ -383,6 +383,39 @@ def test_connect_with_label(client, local_session):
     client.post(f"/api/connections/{conn2}/disconnect")
 
 
+def test_run_quick_command(client, local_session):
+    """快捷命令触发：exec=独立执行返回结果；write=发送到共享终端。"""
+    # 建一个本地会话 + 一条快捷命令（自建自删）
+    sid = local_session
+    cmd = client.post("/api/quick/commands", json={
+        "name": "smoke-run-cmd", "command": "echo QUICK_RUN_OK", "group_id": None,
+    }).json()
+    cid = cmd["id"]
+
+    # exec 模式：独立非交互执行
+    r = client.post(f"/api/quick/commands/{cid}/run",
+                    json={"sid": sid, "mode": "exec"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mode"] == "exec" and "QUICK_RUN_OK" in body["stdout"] and body["exit_code"] == 0
+
+    # write 模式：发送到共享终端（新建连接），返回 conn_id，命令进入缓冲
+    r2 = client.post(f"/api/quick/commands/{cid}/run",
+                     json={"sid": sid, "mode": "write"})
+    assert r2.status_code == 200
+    wb = r2.json()
+    assert wb["mode"] == "write" and wb["conn_id"] and wb["sent"] > 0
+    buf = client.get(f"/api/connections/{wb['conn_id']}/buffer", params={"since": 0}).json()
+    assert "QUICK_RUN_OK" in buf["data"]
+    client.post(f"/api/connections/{wb['conn_id']}/disconnect")
+
+    # 不存在命令 → 404
+    assert client.post("/api/quick/commands/nope/run",
+                       json={"sid": sid, "mode": "exec"}).status_code == 404
+
+    client.delete(f"/api/quick/commands/{cid}")
+
+
 def test_connection_label_patch(client, local_session):
     """PATCH 连接 label：改显示名；null 回落会话名；不存在 404。"""
     conn = client.post(f"/api/sessions/{local_session}/connect").json()["conn_id"]

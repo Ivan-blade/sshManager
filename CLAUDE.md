@@ -123,7 +123,7 @@ Python 后端 ──▶ PTY ──▶ 远端 shell/SSH（local 传输则是本�
 | `terminal.py` | `WS /ws/terminal/{id}` 终端流（input/resize → 服务端；buffer/output/status ← 服务端） |
 | `ai.py` | **AI 双路径**：`POST /exec`（独立/非交互，直接返回）/ `POST /find`（递归搜索，`shlex.quote` 防注入）。同文件另注册 `conn_router`（`/api/connections/*`，按 **conn_id** 对后台连接 **write**（协同注入，人可见）/ **buffer**（增量读取）/ **status**（空闲检测）/ **label**（连接显示名，界面 Rename Tab 与 AI connect 共用）/ **disconnect**；`GET /background` 列出全部后台保活连接）与 `capabilities_router`（AI 能力发现） |
 | `capabilities.py` | AI 能力注册表（name/method/path/summary，body schema 从 Pydantic 模型推导），供 AI agent 自举发现后端能做什么、怎么调 |
-| `quick.py` | 快捷命令分组 + 命令 CRUD + 导入导出（`/api/quick`） |
+| `quick.py` | 快捷命令分组 + 命令 CRUD + 导入导出 + **触发执行**（`POST /commands/{cid}/run`，exec 独立/write 协同）（`/api/quick`） |
 | `sftp.py` | SFTP ls/upload/download/edit/delete/递归搜索；SSH 复用会话连接，local 映射本机文件系统 |
 
 ## AI 设计
