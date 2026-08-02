@@ -1,16 +1,21 @@
-"""快捷命令：分组 + 命令 CRUD + 导入导出。"""
+"""快捷命令：分组 + 命令 CRUD + 导入导出 + 触发执行。"""
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..deps import get_quick_store
+from ..deps import get_manager, get_quick_store, get_store
 from ..models import (QuickCommandCreate, QuickCommandUpdate,
-                      QuickGroupCreate, QuickGroupUpdate)
+                      QuickGroupCreate, QuickGroupUpdate, QuickRunRequest)
 from ..quickstore import QuickStore
+from ..sessions import SessionManager
+from ..store import SessionStore
+from ..transports import build_transport
 
 router = APIRouter(prefix="/api/quick", tags=["quick"])
 QuickDep = Annotated[QuickStore, Depends(get_quick_store)]
+StoreDep = Annotated[SessionStore, Depends(get_store)]
+ManagerDep = Annotated[SessionManager, Depends(get_manager)]
 
 
 class QuickExportRequest(BaseModel):
@@ -88,3 +93,45 @@ def delete_command(cid: str, store: QuickDep) -> dict:
     if not store.delete_command(cid):
         raise HTTPException(404, "command not found")
     return {"ok": True}
+
+
+@router.post("/commands/{cid}/run")
+async def run_quick_command(cid: str, body: QuickRunRequest,
+                            store: QuickDep, sess_store: StoreDep,
+                            manager: ManagerDep) -> dict:
+    """触发快捷命令。
+
+    mode=exec（默认）：独立非交互执行，直接返回结果；
+    mode=write：发送到共享终端（协同），可传 conn_id 指定连接（人正在看的那个），不传则新建。
+    """
+    cmd = store.get_command(cid)
+    if not cmd:
+        raise HTTPException(404, "command not found")
+    command = cmd.get("command", "")
+
+    if body.mode == "exec":
+        cfg = sess_store.get(body.sid)
+        if not cfg:
+            raise HTTPException(404, "session not found")
+        transport = build_transport(cfg)
+        await transport.connect()
+        try:
+            result = await transport.exec(command)
+        finally:
+            await transport.close()
+        return {"ok": True, "mode": "exec", "sid": body.sid,
+                "stdout": result.stdout, "stderr": result.stderr,
+                "exit_code": result.exit_code, "duration_ms": result.duration_ms,
+                "timed_out": result.timed_out}
+
+    # write：写入共享终端（协同路径）
+    ts = manager.get(body.conn_id) if body.conn_id else None
+    if ts is None:
+        ts = manager.create(body.sid, label=cmd.get("name"))
+        if ts is None:
+            raise HTTPException(404, "session not found")
+    if not ts.connected:
+        await ts.connect()
+    await ts.write(command)
+    return {"ok": True, "mode": "write", "sid": body.sid,
+            "conn_id": ts.id, "sent": len(command)}

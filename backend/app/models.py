@@ -80,6 +80,13 @@ class ConnectRequest(BaseModel):
     label: Optional[str] = Field(None, max_length=64)
 
 
+class QuickRunRequest(BaseModel):
+    """触发快捷命令：mode=write 发送到共享终端（协同）/ exec 独立执行返回结果。"""
+    sid: str
+    mode: Literal["write", "exec"] = "exec"
+    conn_id: Optional[str] = None  # write 模式可选：指定要写入的连接（人正在看的那个）
+
+
 class LabelRequest(BaseModel):
     """设置/清除连接的显示名；null 则回落到会话名。与界面 Rename Tab 共用 ts.label。"""
     label: Optional[str] = Field(None, max_length=64)
