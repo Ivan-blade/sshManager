@@ -329,7 +329,7 @@ class LocalTransport(Transport):
                               duration_ms=int((time.monotonic() - t0) * 1000))
 
     def create_interactive(self) -> InteractiveChannel:
-        return LocalInteractiveChannel("/bin/bash")
+        return LocalInteractiveChannel(_local_shell())
 
 
 # --------------------------------------------------------------------------- #
