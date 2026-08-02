@@ -163,7 +163,23 @@ class SSHTransport(Transport):
 # 本地（开发 / 验证用）
 # --------------------------------------------------------------------------- #
 def _local_shell() -> str:
-    return os.environ.get("SHELL", "/bin/bash")
+    """本地终端用用户登录 shell（与 macOS「终端」一致）。
+
+    优先取 passwd 数据库的登录 shell（zsh 等），不信任 $SHELL 环境变量——
+    GUI 启动的后端可能未设置 $SHELL 或指向旧 bash。兜底 macOS→zsh、其他→bash。
+    """
+    try:
+        import pwd
+        shell = pwd.getpwuid(os.getuid()).pw_shell
+        if shell:
+            return shell
+    except Exception:
+        pass
+    shell = os.environ.get("SHELL")
+    if shell:
+        return shell
+    import sys
+    return "/bin/zsh" if sys.platform == "darwin" else "/bin/bash"
 
 
 class LocalInteractiveChannel(InteractiveChannel):
