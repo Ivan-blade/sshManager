@@ -306,6 +306,51 @@ def test_ai_capabilities(client):
     assert client.get("/api/ai/capabilities/nope").status_code == 404
 
 
+def test_connection_status_idle_and_interactive_write(client, local_session):
+    """空闲检测 + 交互路径：connect → 等 idle=true（提示符就绪）→ write 注入 → 输出确认 → 回落空闲。"""
+    c = client.post(f"/api/sessions/{local_session}/connect").json()
+    conn = c["conn_id"]
+
+    st = client.get(f"/api/connections/{conn}/status").json()
+    assert st["connected"] is True and st["conn_id"] == conn
+    assert st["idle_ms"] >= 0
+
+    # 提示符出现、终端安静后应进入 idle
+    ok = False
+    for _ in range(60):
+        st = client.get(f"/api/connections/{conn}/status").json()
+        if st["idle"] is True:
+            ok = True
+            break
+        time.sleep(0.1)
+    assert ok, "连接应在提示符出现后进入空闲（idle=true）"
+
+    # 注入交互式命令，buffer 确认执行成功（交互路径：write + 增量 buffer）
+    r = client.post(f"/api/connections/{conn}/write", json={"data": "echo STATUS_OK\n"})
+    assert r.status_code == 200
+    got = ""
+    for _ in range(60):
+        b = client.get(f"/api/connections/{conn}/buffer", params={"since": 0}).json()
+        got = b["data"]
+        if "STATUS_OK" in got:
+            break
+        time.sleep(0.1)
+    assert "STATUS_OK" in got, "交互命令应执行并进入 buffer"
+
+    # 输出停止后再次进入空闲（可安全发起下一轮注入）
+    ok2 = False
+    for _ in range(60):
+        st = client.get(f"/api/connections/{conn}/status").json()
+        if st["idle"] is True:
+            ok2 = True
+            break
+        time.sleep(0.1)
+    assert ok2, "命令输出停止后应回落为空闲"
+
+    assert client.get("/api/connections/nonexistent/status").status_code == 404
+    client.post(f"/api/connections/{conn}/disconnect")
+
+
 def test_sftp_local(client, local_session):
     target = tempfile.mkdtemp()
     payload = b"sftp-test-content"

@@ -137,6 +137,11 @@ CAPABILITIES: list[dict] = [
            "description": "上次读取的 total 偏移"}],
          '{"since":n,"total":n,"gap":bool,"data":"..."}',
          chain="配合 write_terminal：每次把 since 设为上次返回的 total；gap=true 表示偏移已超出缓冲窗口（256KB），需从 0 重拉。"),
+    _cap("connection_status", "GET", "/api/connections/{conn_id}/status",
+         "查询连接状态：connected / idle / idle_ms。idle=true 表示终端已空闲（N 毫秒无输出），可确认提示符就绪",
+         [{"name": "conn_id", "in": "path", "type": "string", "required": True, "description": "连接 ID"}],
+         '{"conn_id":..,"connected":bool,"idle":bool,"idle_ms":n,"buffer_total":n}',
+         chain="配合 write_terminal：写之前先查 idle=true（空闲）再注入，避免和正在运行的命令交错；写完用 read_buffer 增量取输出。"),
     # ---- SFTP ----
     _cap("sftp_list", "GET", "/api/sessions/{sid}/sftp/ls",
          "列出远端目录（SSH 复用连接；local 为本机文件系统）",

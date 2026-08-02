@@ -81,6 +81,19 @@ async def conn_write(conn_id: str, body: TerminalInput, manager: ManagerDep) -> 
     return {"ok": True, "conn_id": conn_id, "written": len(body.data)}
 
 
+@conn_router.get("/{conn_id}/status")
+async def conn_status(conn_id: str, manager: ManagerDep) -> dict:
+    """查询连接状态：connected / idle / idle_ms。
+
+    idle=true 表示终端已空闲（超过 TERMINAL_IDLE_THRESHOLD_MS 无输出），
+    AI 注入命令前可先查它确认提示符就绪，避免和正在运行的命令交错。
+    """
+    ts = manager.get(conn_id)
+    if ts is None:
+        raise HTTPException(404, "connection not found")
+    return ts.to_status()
+
+
 @conn_router.get("/{conn_id}/buffer")
 async def conn_buffer(conn_id: str, manager: ManagerDep,
                       since: int = Query(0, ge=0)) -> dict:

@@ -101,14 +101,12 @@ class Transport:
 
 **groups.py — 分组 CRUD**：`GET/POST/PATCH/DELETE /api/groups`；删除分组回落组内会话。
 
-**ai.py — AI 双路径 + 能力发现**：
-- `POST /write`：向共享终端写入（协同路径），需已连接。
-- `GET /buffer?since=`：增量读取（AI 用）。
-- `POST /exec`：独立路径，`build_transport(cfg)` 新建连接执行（SSH 复用会话连接），返回 `{stdout, stderr, exit_code, duration_ms, timed_out}`。
-- `POST /find`：参数经 `shlex.quote` 安全引用后组 find 命令执行。
+**ai.py — AI 双路径（交互/非交互）+ 能力发现**：
+- **独立路径（非交互，默认优先）**：`POST /exec`——`build_transport(cfg)` 新建连接执行，返回 `{stdout, stderr, exit_code, duration_ms, timed_out}`；`POST /find`——参数经 `shlex.quote` 安全引用后组 find 命令。
+- **协同路径（交互）**：`POST /api/connections/{conn_id}/write`——向共享终端注入（处理需 TTY 的交互命令）；`GET /api/connections/{conn_id}/buffer?since=`——增量读取；`GET /api/connections/{conn_id}/status`——**空闲检测**（`idle/idle_ms`，注入前确认提示符就绪）。
 - `GET /api/ai/capabilities` / `GET /api/ai/capabilities/{name}`：能力发现（见 `capabilities.py`）。
 
-**capabilities.py — 能力注册表**：每项 `name/method/path/summary/params/returns/example`；body 参数从 Pydantic 模型 `model_json_schema()` 推导（`_body_schema` 辅助函数）。`overview()` 返回轻量清单，`detail(name)` 返回完整参数。
+**capabilities.py — 能力注册表**：每项 `name/method/path/summary/params/returns/example/chain`；body 参数从 Pydantic 模型 `model_json_schema()` 推导（`_body_schema` 辅助函数）。`chain` 描述调用链（前置/后续），`overview().note` 是「工作流地图」。`overview()` 返回轻量清单，`detail(name)` 返回完整参数。
 
 **sftp.py**：SSH 用 `conn.start_sftp_client()`（`scandir()` 列目录，条目为 `SFTPName.filename/.attrs`）；local 用 `os.scandir`/文件读写。
 
@@ -171,7 +169,7 @@ cd backend && .venv/bin/python -m pytest tests/ -v
 - SFTP 无前端 UI（仅 API）。
 - 密码明文存储（生产化需加密）。
 - `known_hosts=None` 不校验主机密钥（与 xshell 一致，安全权衡）。
-- SSH 交互终端注入命令前需等登录横幅/提示符（启动时序，AI 写路径需空闲检测）。
+- SSH 交互终端注入命令前需等登录横幅/提示符（启动时序）——**空闲检测已实现**（`GET /api/connections/{conn_id}/status` 的 `idle`），AI 注入前先确认 `idle=true`。
 
 ### 待办
 - [ ] AI 后台 WebSocket 长连接 + 回显浏览器的「一起干」模式

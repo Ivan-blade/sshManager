@@ -41,11 +41,29 @@ class TerminalSession:
         self._start = 0          # 缓冲首片对应的流偏移
         self._write_lock = asyncio.Lock()
         self._read_task: Optional[asyncio.Task] = None
+        # 空闲检测：最近一次输出的时间戳（连接刚建立时视为非空闲，避免提示符还没出现就误判）
+        self._last_output = time.monotonic()
+
+    def idle_ms(self) -> int:
+        """距上次终端输出过去的毫秒数（无输出时间越长越接近空闲）。"""
+        return max(0, int((time.monotonic() - self._last_output) * 1000))
+
+    def to_status(self) -> dict:
+        """连接状态：AI 注入前可查 idle 确认提示符就绪。"""
+        return {
+            "conn_id": self.id,
+            "sid": self.sid,
+            "connected": self.connected,
+            "idle": self.idle_ms() >= config.TERMINAL_IDLE_THRESHOLD_MS,
+            "idle_ms": self.idle_ms(),
+            "buffer_total": self._total,
+        }
 
     # ---------------- 缓冲 / 增量获取 ----------------
     def append(self, text: str) -> None:
         if not text:
             return
+        self._last_output = time.monotonic()
         self._parts.append(text)
         self._chars += len(text)
         self._total += len(text)

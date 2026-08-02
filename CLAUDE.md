@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 开发进度快照（2026-08-01 手写记录，防上下文丢失）
 
-**已完成并验证**：后端全链路（会话/分组 CRUD、过滤、导入导出、**独立连接模型**——每 tab 一个独立 pty/缓冲、**后台保活**——关页面 SSH 不断可恢复、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find、SFTP 含删除/编辑/递归搜索、**AI 能力发现接口**、**快捷命令导入导出**）、前端（**Warp 风深色主题 + xshell 布局 + 分组树 + 多标签终端 + 右键菜单**（含二级子菜单）、**关闭 tab 两种方式**、**后台运行标记**、**快捷命令栏**、**SFTP 面板**（拖拽上传/双击下载/右键菜单）、**界面文案已中→英**）、Electron 壳、pytest 12/12 绿 + 浏览器 E2E 全过 + SSH 真机全链路验证。
+**已完成并验证**：后端全链路（会话/分组 CRUD、过滤、导入导出、**独立连接模型**——每 tab 一个独立 pty/缓冲、**后台保活**——关页面 SSH 不断可恢复、终端 WS 流 + 增量 buffer、AI 双路径 write/exec/find + **空闲检测**（`connection_status` 返回 idle/idle_ms）、SFTP 含删除/编辑/递归搜索、**AI 能力发现接口**（36 个能力 + 工作流地图）、**快捷命令导入导出**）、前端（**Warp 风深色主题 + xshell 布局 + 分组树 + 多标签终端 + 右键菜单**（含二级子菜单）、**关闭 tab 两种方式**、**后台运行标记**、**快捷命令栏**、**SFTP 面板**（拖拽上传/双击下载/右键菜单）、**界面文案已中→英**）、Electron 壳、pytest 13/13 绿 + 浏览器 E2E 全过 + SSH 真机全链路验证。
 **当前运行态**：后端跑在 **127.0.0.1:8747**（`backend/.venv/bin/python run.py` 后台启动，日志 `/tmp/sshmgr_server.log`）；数据已清理，仅 1 个「本地开发机」演示会话。
 **已验证**：SSH 真机路径全链路已实测（`192.168.8.101`，root 密码登录）：connect / exec / find / SFTP ls+上传+下载回环 / 交互终端均通过。注意：SSH 交互终端**注入命令前需等登录横幅/提示符出现**（启动时序，架构中"空闲检测"即为此设计）。
 **下一步候选方向**（用户待定）：① AI 后台 WebSocket 长连接回显浏览器的「一起干」模式 ② 会话/分组/快捷命令的拖拽排序 ③ 密码加密存储。
@@ -78,6 +78,7 @@ Python 后端 ──▶ PTY ──▶ 远端 shell/SSH（local 传输则是本�
 
 - `TerminalSession`：输出环形缓冲（上限 256KB，`config.TERMINAL_BUF_LIMIT`）+ **增量读取**（`get_buffer(since)`，返回 `since/total/gap/data`；`gap=True` 表示调用方偏移已超出缓冲窗口）。这是「AI 增量获取、避免全量拉取撑爆上下文」的实现。
 - **单一写锁**：所有来源（人 ws / AI write 接口）的输入串行进 pty，缓解并发交错。
+- **空闲检测**：`TerminalSession` 记录最近输出时间戳（`append()` 时更新），`GET /api/connections/{conn_id}/status` 返回 `idle/idle_ms`（阈值 `config.TERMINAL_IDLE_THRESHOLD_MS`）——AI 注入前确认提示符就绪，缓解与运行中命令交错。
 - `SessionManager` 惰性建运行时；`remove()`/`delete` 路由必须是 async（避免 sync 线程里 `create_task` 报 "no running event loop"）。
 
 ### 存储（backend/app/store.py、quickstore.py）
@@ -94,17 +95,19 @@ Python 后端 ──▶ PTY ──▶ 远端 shell/SSH（local 传输则是本�
 | `groups.py` | 会话分组 CRUD（删除分组时组内会话回根层级） |
 | `transfer.py` | 导入/导出（分组+会话，按选择筛选、文件/剪贴板；导入按名称去重、重写 group_id） |
 | `terminal.py` | `WS /ws/terminal/{id}` 终端流（input/resize → 服务端；buffer/output/status ← 服务端） |
-| `ai.py` | **AI 双路径**：`POST /write`（协同，写共享终端）/ `POST /exec`（独立，非交互直接返回）/ `GET /buffer`（增量）/ `POST /find`（递归搜索，`shlex.quote` 防注入）。同文件另注册两个 router：`conn_router`（`/api/connections/*`，按 **conn_id** 对后台连接 write/buffer/disconnect + `GET /background` 列出全部后台保活连接）与 `capabilities_router`（AI 能力发现） |
+| `ai.py` | **AI 双路径**：`POST /exec`（独立/非交互，直接返回）/ `POST /find`（递归搜索，`shlex.quote` 防注入）。同文件另注册 `conn_router`（`/api/connections/*`，按 **conn_id** 对后台连接 **write**（协同注入，人可见）/ **buffer**（增量读取）/ **status**（空闲检测）/ **disconnect**；`GET /background` 列出全部后台保活连接）与 `capabilities_router`（AI 能力发现） |
 | `capabilities.py` | AI 能力注册表（name/method/path/summary，body schema 从 Pydantic 模型推导），供 AI agent 自举发现后端能做什么、怎么调 |
 | `quick.py` | 快捷命令分组 + 命令 CRUD + 导入导出（`/api/quick`） |
 | `sftp.py` | SFTP ls/upload/download/edit/delete/递归搜索；SSH 复用会话连接，local 映射本机文件系统 |
 
 ## AI 设计
 
-- **协同路径**（`/write`）：AI 注入共享终端，输出进缓冲并对所有订阅者回显。有并发问题，靠写锁 + 空闲注入缓解。连接级等效接口在 `/api/connections/{conn_id}/write`。
-- **独立路径**（`/exec`、`/find`）：非交互执行直接返回，不经过共享终端，无并发问题，**默认优先**。
-- **能力发现**：`GET /api/ai/capabilities`（概述）→ `GET /api/ai/capabilities/{name}`（参数详情）→ 调用对应 REST 接口，AI agent 据此自举（见 `capabilities.py`）。
-- 待实现：AI 模型接入（把意图/输出理解接到这些接口上）；三种后台操作形态（非交互 / 交互 / WebSocket 长连接回显浏览器实现「一起干」）。
+**两类执行均已实现**：
+- **独立路径（非交互，默认优先）**：`POST /exec`、`POST /find`——非交互执行直接返回，不经过共享终端，无并发问题。
+- **协同路径（交互）**：`POST /api/connections/{conn_id}/write` + `GET /buffer` + `GET /status`——AI 注入共享终端（可处理 vim/top/密码提示等需要 TTY 的交互式命令），输出进缓冲并对所有订阅者回显。注入前用 `connection_status` 确认 `idle=true`（空闲检测已实现，阈值 `config.TERMINAL_IDLE_THRESHOLD_MS`），避免和运行中的命令交错。
+
+- **能力发现**：`GET /api/ai/capabilities`（概述 + 工作流地图）→ `GET /api/ai/capabilities/{name}`（参数 + chain）→ 调用对应 REST 接口，AI agent 据此自举（见 `capabilities.py`）。
+- 待实现：AI 模型接入（把意图/输出理解接到这些接口上）；WebSocket 长连接回显浏览器的「一起干」模式。
 
 ## 前端（frontend/）
 

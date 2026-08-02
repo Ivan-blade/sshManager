@@ -14,8 +14,9 @@
 | **多标签终端**（同时开多个会话） | ✅ 已实现 | 主区标签栏 |
 | 终端会话（WebSocket 流 + resize） | ✅ 已实现 | 点击会话 / 标签切换 |
 | 终端输出增量获取（AI getBuffer） | ✅ 已实现（服务端） | `GET /buffer` |
-| AI 写入终端（协作） | ✅ 已实现 | 后端接口 |
+| AI 写入终端（协作/交互式） | ✅ 已实现 | 后端接口 |
 | AI 独立执行（非交互） | ✅ 已实现 | 后端接口 |
+| AI 空闲检测（注入前确认提示符就绪） | ✅ 已实现 | `GET /api/connections/{conn_id}/status` |
 | 当前路径递归搜索（find） | ✅ 已实现 | 后端接口 |
 | **AI 能力发现**（概述 + 按接口查参数） | ✅ 已实现 | `GET /api/ai/capabilities*` |
 | SFTP 文件浏览 / 上传 / 下载 / 编辑 / 删除 / 递归搜索 | ✅ 已实现 | SFTP 面板 + REST API |
@@ -118,6 +119,7 @@ AI 流程：先 `GET /capabilities` 看能做什么 → `GET /capabilities/{name
 | GET | `/api/connections/background` | 列出全部后台保活连接（跨会话，含会话名/主机） |
 | POST | `/api/connections/{conn_id}/write` | AI 协同：写入指定连接（独立终端） |
 | GET | `/api/connections/{conn_id}/buffer?since=` | AI 增量获取指定连接输出缓冲 |
+| GET | `/api/connections/{conn_id}/status` | AI 空闲检测：connected / idle / idle_ms（注入前确认提示符就绪） |
 | POST | `/api/connections/{conn_id}/disconnect` | 断开指定连接 |
 | POST | `/api/sessions/{id}/exec` | AI 独立：非交互执行命令 |
 | POST | `/api/sessions/{id}/find` | AI：递归搜索 |
