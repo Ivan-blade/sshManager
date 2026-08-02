@@ -5,3 +5,12 @@ backend/.pytest_cache/
 *.pyc
 __pycache__/
 .DS_Store
+
+# 打包产物
+frontend/dist/
+backend/build/
+backend/dist/
+*.dmg
+*.app
+frontend/build/*.icns
+frontend/build/*.ico

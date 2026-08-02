@@ -3,11 +3,74 @@
   "version": "0.1.0",
   "private": true,
   "description": "人机协作的 SSH 工具（xshell 增强版）",
+  "author": "sshManager <noreply@example.com>",
   "main": "electron/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "package:backend": "cd ../backend && .venv/bin/python -m PyInstaller --clean --noconfirm sshmgr.spec",
+    "dist": "electron-builder --mac",
+    "dist:dir": "electron-builder --mac --dir"
   },
   "devDependencies": {
-    "electron": "^31.7.0"
+    "electron": "^31.7.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.sshmgr.desktop",
+    "productName": "sshManager",
+    "asar": true,
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist/sshmgr-backend",
+        "to": "backend/sshmgr-backend"
+      }
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "sshManager",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Development"
+    }
   }
 }

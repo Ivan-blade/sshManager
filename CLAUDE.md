@@ -45,6 +45,32 @@ python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requir
 cd frontend && npm install
 ```
 
+## 打包分发（macOS .app/.dmg，未签名）
+
+两步：PyInstaller 把后端（含前端静态资源）冻成 onedir 二进制 → electron-builder 出 .app/.dmg。
+
+```bash
+# 0. 首次装工具
+cd backend && .venv/bin/pip install "pyinstaller>=6.21"
+cd frontend && npm install --save-dev electron-builder@^26.15.3
+
+# 1. 打后端二进制（backend/dist/sshmgr-backend/）
+cd backend && .venv/bin/python -m PyInstaller --clean --noconfirm sshmgr.spec
+
+# 2. 出包（不签名；--dir 只出 .app 更快的验证）
+cd frontend
+CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --dir
+CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac   # 出 .dmg + .zip
+```
+
+**关键点**（详见 `backend/sshmgr.spec`、`frontend/electron/main.js`、`frontend/package.json`）：
+- **frozen 态**（`sys.frozen`）：`config.py` 前端资源走 `_MEIPASS/frontend`（只读打进二进制）；**用户数据落到应用数据目录**（macOS `~/Library/Application Support/sshManager/data`，win `%APPDATA%`，linux `~/.config`）——不是 repo 的 `data/`。
+- Electron 打包态 spawn `Resources/backend/sshmgr-backend/sshmgr-backend`，并**自动选空闲端口**（dev 才是 8747）；`SSHMANAGER_PORT` 显式值优先。
+- spec 里前端**必须显式列文件**（index.html/app.js/style.css/vendor），不能整个 `../frontend`——`node_modules` 250MB 会被误打包。
+- **未签名**：本机双击可用；发给别人首次要右键→打开；dmg 下载带 quarantine 可用 `xattr -dr com.apple.quarantine` 清除。
+- **Rosetta**：x86_64 包在 Apple Silicon 上跑 Rosetta；universal 是后续任务。
+- 用户数据迁移：把 repo `data/*.json` 拷到应用数据目录一次（**不打包进 dmg**，会话含明文密码）。
+
 ## 项目是什么
 
 `sshManager` —— **人机协作的 xshell**：人和 AI 在同一个浏览器界面里协同操作 SSH 终端。人和 AI 各自有独立执行策略，共享同一个终端会话。
