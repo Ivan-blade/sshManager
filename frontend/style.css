@@ -622,3 +622,38 @@ body {
 .status.err { color: var(--danger); }
 
 .hidden { display: none !important; }
+
+/* ============ 白天模式（Catppuccin Latte，与暗色同源配色） ============ */
+:root[data-theme="light"] {
+  --bg: #eff1f5;
+  --bg-panel: #e6e9ef;
+  --bg-raised: #ffffff;
+  --bg-hover: #dce0e8;
+  --bg-active: #ccd0da;
+  --border: #bcc0cc;
+  --border-strong: #acb0be;
+  --text: #4c4f69;
+  --text-dim: #5c5f77;
+  --text-faint: #6c6f85;
+  --accent: #8839ef;
+  --accent-strong: #7c3aed;
+  --accent-soft: rgba(136, 57, 239, 0.12);
+  --ok: #40a02b;
+  --warn: #b57614;
+  --danger: #d20f39;
+}
+
+/* 白天模式局部微调：顶栏改亮色半透明、顶部紫光减弱 */
+:root[data-theme="light"] #topnav {
+  background: rgba(239, 241, 245, 0.7); /* #eff1f5 半透明，配亮色 */
+}
+:root[data-theme="light"] #app {
+  background:
+    radial-gradient(1200px 300px at 50% -100px, rgba(136, 57, 239, 0.06), transparent 70%),
+    var(--bg);
+}
+
+/* 主题切换按钮靠右 */
+#btn-theme { margin-left: auto; }
+/* 空状态「+ New Session」白字 */
+#empty-new { color: #fff; font-weight: 600; }

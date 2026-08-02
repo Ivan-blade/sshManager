@@ -1,11 +1,11 @@
 """会话配置 CRUD / 过滤 / 导入导出 / 运行时连接控制。"""
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..deps import get_manager, get_store
-from ..models import SessionCreate, SessionUpdate
+from ..models import ConnectRequest, SessionCreate, SessionUpdate
 from ..sessions import SessionManager
 from ..store import SessionStore
 
@@ -75,11 +75,15 @@ async def delete_session(sid: str, store: StoreDep, manager: ManagerDep) -> dict
 
 # ---- 运行时连接控制 ----
 @router.post("/{sid}/connect")
-async def connect_session(sid: str, store: StoreDep, manager: ManagerDep) -> dict:
-    """创建一个新的独立连接，返回 conn_id（AI 协作路径先拿 conn_id 再 write/buffer）。"""
+async def connect_session(sid: str, store: StoreDep, manager: ManagerDep,
+                          body: Optional[ConnectRequest] = None) -> dict:
+    """创建一个新的独立连接，返回 conn_id（AI 协作路径先拿 conn_id 再 write/buffer）。
+
+    body.label 可选：连接的显示名覆盖（默认显示所属会话名）。
+    """
     if not store.get(sid):
         raise HTTPException(404, "session not found")
-    ts = manager.create(sid)
+    ts = manager.create(sid, label=body.label if body else None)
     try:
         await ts.connect()
     except Exception as exc:

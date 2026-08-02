@@ -117,11 +117,11 @@ Python 后端 ──▶ PTY ──▶ 远端 shell/SSH（local 传输则是本�
 
 | 文件 | 职责 |
 |------|------|
-| `sessions.py` | 会话 CRUD + IP/名称同时过滤 + connect/disconnect/status |
+| `sessions.py` | 会话 CRUD + IP/名称同时过滤 + connect（可选 label 显示名）/disconnect/status |
 | `groups.py` | 会话分组 CRUD（删除分组时组内会话回根层级） |
 | `transfer.py` | 导入/导出（分组+会话，按选择筛选、文件/剪贴板；导入按名称去重、重写 group_id） |
 | `terminal.py` | `WS /ws/terminal/{id}` 终端流（input/resize → 服务端；buffer/output/status ← 服务端） |
-| `ai.py` | **AI 双路径**：`POST /exec`（独立/非交互，直接返回）/ `POST /find`（递归搜索，`shlex.quote` 防注入）。同文件另注册 `conn_router`（`/api/connections/*`，按 **conn_id** 对后台连接 **write**（协同注入，人可见）/ **buffer**（增量读取）/ **status**（空闲检测）/ **disconnect**；`GET /background` 列出全部后台保活连接）与 `capabilities_router`（AI 能力发现） |
+| `ai.py` | **AI 双路径**：`POST /exec`（独立/非交互，直接返回）/ `POST /find`（递归搜索，`shlex.quote` 防注入）。同文件另注册 `conn_router`（`/api/connections/*`，按 **conn_id** 对后台连接 **write**（协同注入，人可见）/ **buffer**（增量读取）/ **status**（空闲检测）/ **label**（连接显示名，界面 Rename Tab 与 AI connect 共用）/ **disconnect**；`GET /background` 列出全部后台保活连接）与 `capabilities_router`（AI 能力发现） |
 | `capabilities.py` | AI 能力注册表（name/method/path/summary，body schema 从 Pydantic 模型推导），供 AI agent 自举发现后端能做什么、怎么调 |
 | `quick.py` | 快捷命令分组 + 命令 CRUD + 导入导出（`/api/quick`） |
 | `sftp.py` | SFTP ls/upload/download/edit/delete/递归搜索；SSH 复用会话连接，local 映射本机文件系统 |
