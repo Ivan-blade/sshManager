@@ -28,8 +28,17 @@ sshManager/
 │   └── tests/test_smoke.py     # 冒烟测试
 ├── frontend/                   # 前端（FastAPI 静态托管）
 │   ├── index.html              # 单页布局 + 弹窗
-│   ├── style.css               # 暗色主题
-│   ├── app.js                  # 全部前端逻辑
+│   ├── style.css               # 暗/亮主题（CSS 变量）
+│   ├── js/                     # 前端逻辑（按域拆分，index.html 按序加载）
+│   │   ├── core.js             #   $/state/api/modal 助手/主题
+│   │   ├── tree.js             #   会话/分组树 + 状态刷新
+│   │   ├── terminal.js         #   多标签终端 + WebSocket
+│   │   ├── ctxmenu.js          #   右键菜单
+│   │   ├── modals.js           #   新建/编辑/导入/导出
+│   │   ├── bg.js               #   后台连接面板
+│   │   ├── quick.js            #   快捷命令
+│   │   ├── sftp.js             #   SFTP 面板
+│   │   └── main.js             #   事件绑定 + 启动（最后加载）
 │   ├── vendor/                 # xterm.js + addon-fit 本地化（离线可用）
 │   ├── electron/main.js        # Electron 壳
 │   └── package.json
@@ -103,7 +112,7 @@ class Transport:
 
 **ai.py — AI 双路径（交互/非交互）+ 能力发现**：
 - **独立路径（非交互，默认优先）**：`POST /exec`——`build_transport(cfg)` 新建连接执行，返回 `{stdout, stderr, exit_code, duration_ms, timed_out}`；`POST /find`——参数经 `shlex.quote` 安全引用后组 find 命令。
-- **协同路径（交互）**：`POST /api/connections/{conn_id}/write`——向共享终端注入（处理需 TTY 的交互命令）；`GET /api/connections/{conn_id}/buffer?since=`——增量读取；`GET /api/connections/{conn_id}/status`——**空闲检测**（`idle/idle_ms`，注入前确认提示符就绪）。
+- **协同路径（交互）**：`POST /api/connections/{conn_id}/write`——向共享终端注入（处理需 TTY 的交互命令）；`GET /api/connections/{conn_id}/buffer?since=`——增量读取；`GET /api/connections/{conn_id}/status`——**空闲检测**（`idle/idle_ms`，注入前确认提示符就绪）；`PATCH /api/connections/{conn_id}/label`——连接显示名（`connect_session` 创建时可带 label，界面 Rename Tab 也走这里，统一存 `ts.label`）。
 - `GET /api/ai/capabilities` / `GET /api/ai/capabilities/{name}`：能力发现（见 `capabilities.py`）。
 
 **capabilities.py — 能力注册表**：每项 `name/method/path/summary/params/returns/example/chain`；body 参数从 Pydantic 模型 `model_json_schema()` 推导（`_body_schema` 辅助函数）。`chain` 描述调用链（前置/后续），`overview().note` 是「工作流地图」。`overview()` 返回轻量清单，`detail(name)` 返回完整参数。
