@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Python 类体陷阱**：类方法叫 `list` 会遮蔽内置 `list`，导致后续方法注解 `-> list[dict]` 报错 → 方法改名。
 - **macOS `/tmp` 是符号链接**：`find /tmp` 默认不穿透（直接跑 shell 也一样），不是代码 bug，用 `/private/tmp` 或真实路径。
 - **uvicorn reload_dirs 必须限定 `["app"]`**，否则写 `data/sessions.json` 会触发服务重启。
-- **端口**：默认 8747，`SSHMANAGER_PORT` 环境变量覆盖；Electron 与后端读同一环境变量；前端 ws 用 `location.host` 自适应端口。
+- **端口**：默认 8747，`SSHMANAGER_PORT` 环境变量覆盖；Electron 与后端读同一环境变量；前端 ws 用 `location.host` 自适应端口。`GET /api/health` 为健康检查（`main.py`，Electron 启动探测用它）。
 - **PATCH 无法置空字段**：`model_dump(exclude_none=True)` 会把显式 `null` 也丢掉 → 会话无法移出分组。用 `model_fields_set` 判断「未传」vs「显式置空」，显式 null 单独放行。
 - **前端分组树结构**：折叠要生效，children 必须是与行头**兄弟**的 `div.group-children`（CSS 用 `>` 或兄弟选择器），别把 children 嵌进行头里否则点击行头会误触子项。
 - **`document.querySelector` 会命中 `display:none` 元素**：E2E 判断可见性要用 `offsetParent === null` 而不是元素是否存在。

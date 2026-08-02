@@ -115,6 +115,7 @@ AI 流程：先 `GET /capabilities` 看能做什么 → `GET /capabilities/{name
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| GET | `/api/health` | 健康检查（Electron 启动探测 / 容器探活） |
 | WS | `/ws/terminal/{id}` | 终端流：input/resize（客户端→服务端）；buffer/output/status（服务端→客户端） |
 | GET | `/api/connections/background` | 列出全部后台保活连接（跨会话，含会话名/主机） |
 | POST | `/api/connections/{conn_id}/write` | AI 协同：写入指定连接（独立终端） |

@@ -28,7 +28,7 @@ async function waitForBackend(timeoutMs = 15000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     try {
-      const r = await fetch(`${BACKEND_URL}/api/sessions`);
+      const r = await fetch(`${BACKEND_URL}/api/health`);
       if (r.ok) return true;
     } catch (_) { /* 后端尚未就绪 */ }
     await new Promise((r) => setTimeout(r, 300));

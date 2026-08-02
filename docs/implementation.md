@@ -11,7 +11,7 @@ sshManager/
 │   ├── requirements.txt
 │   ├── pytest.ini
 │   ├── app/
-│   │   ├── main.py             # 应用组装：路由注册 + 静态托管 + lifespan 关闭
+│   │   ├── main.py             # 应用组装：路由注册 + `GET /api/health` + 静态托管 + lifespan 关闭
 │   │   ├── config.py           # 路径/常量（缓冲上限、默认终端尺寸）
 │   │   ├── deps.py             # FastAPI 依赖注入（store/manager 单例）
 │   │   ├── models.py           # Pydantic 模型

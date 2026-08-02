@@ -306,6 +306,15 @@ def test_ai_capabilities(client):
     assert client.get("/api/ai/capabilities/nope").status_code == 404
 
 
+def test_health(client):
+    """健康检查：liveness 端点返回 ok + version。"""
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True and body["status"] == "ok"
+    assert body["version"]
+
+
 def test_connection_status_idle_and_interactive_write(client, local_session):
     """空闲检测 + 交互路径：connect → 等 idle=true（提示符就绪）→ write 注入 → 输出确认 → 回落空闲。"""
     c = client.post(f"/api/sessions/{local_session}/connect").json()

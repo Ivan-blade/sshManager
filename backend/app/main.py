@@ -21,6 +21,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="sshManager", version="0.1.0", lifespan=lifespan)
 
+
+@app.get("/api/health")
+def health() -> dict:
+    """轻量健康检查（liveness）：Electron 启动探测用它，容器探活也可用。"""
+    return {"ok": True, "status": "ok", "version": app.version}
+
+
 # 开发期放开 CORS，方便前端以任意来源调试
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=False,
