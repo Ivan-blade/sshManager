@@ -14,3 +14,19 @@ backend/dist/
 *.app
 frontend/build/*.icns
 frontend/build/*.ico
+
+# 环境变量与密钥
+.env*
+.env.*
+!.env.example
+
+# 本地数据库
+*.db
+*.db-wal
+*.db-shm
+
+# 日志
+logs/
+
+# 个人 Claude Code 配置（不入库）
+.claude/
