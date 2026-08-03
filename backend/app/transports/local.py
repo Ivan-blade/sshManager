@@ -34,7 +34,10 @@ class LocalInteractiveChannel(InteractiveChannel):
         pid, master = pty.fork()
         if pid == 0:  # 子进程：获得 pty 控制终端，exec shell
             try:
-                os.execvpe(self._shell, [self._shell, "-i"], env)
+                # -il = 登录 + 交互：与 macOS「终端」一致，先 source ~/.zprofile 再 ~/.zshrc。
+                # 只 -i 时 GUI 启动的后端 PATH 最小，~/.zshrc 里 pyenv 等初始化会因找不到
+                # 命令而失败（如 python 丢失）；-l 让 .zprofile 的 brew shellenv 先补 PATH。
+                os.execvpe(self._shell, [self._shell, "-il"], env)
             except Exception:
                 os._exit(127)
         self._pid, self._master = pid, master
